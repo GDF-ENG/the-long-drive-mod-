@@ -1,6 +1,6 @@
 [功能介绍.md](https://github.com/user-attachments/files/33207311/default.md)
 # TLD 模组工坊 v6.1.2 · 完整功能介绍
-
+这个版本还没有更新设置需要开发者自己敲代码敲出来
 目前版本号为v6.1.2
 
 > 非官方作品，基于开源项目 TLD Mod Installer 二次开发
