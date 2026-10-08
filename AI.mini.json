@@ -1,0 +1,27 @@
+{
+    "ai": {
+        "name": "AI模组推荐助手",
+        "version": "1.0",
+        "description": "我是长途旅行游戏的AI模组推荐助手，能帮您找到最适合的模组！",
+        "intro": "大家好！我是AI模组推荐助手，专为长途旅行(The Long Drive)游戏玩家设计。我可以根据您的需求推荐最适合的模组，帮助您提升游戏体验。无论是车辆改装、生存挑战还是地图扩展，我都能为您找到合适的模组！",
+        "features": ["智能推荐", "模组搜索", "热门排行", "一键下载"]
+    },
+    "recommendation": {
+        "enabled": true,
+        "max_results": 15,
+        "auto_learn": true,
+        "popular_threshold": 5000,
+        "essential_tags": ["必装", "优化", "核心"]
+    },
+    "doubao": {
+        "enabled": false,
+        "api_key": "",
+        "secret_key": "",
+        "model": "doubao-3.5-turbo"
+    },
+    "prompt_templates": {
+        "introduce": "请介绍一下你自己",
+        "recommend": "根据关键词{query}推荐相关模组",
+        "search": "搜索模组{query}"
+    }
+}

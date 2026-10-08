@@ -1,0 +1,28 @@
+{
+    "doubao": {
+        "enabled": true,
+        "api_key": "",
+        "secret_key": "",
+        "model": "doubao-3.5-turbo",
+        "base_url": "https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/completions"
+    },
+    "recommendation": {
+        "enabled": true,
+        "max_results": 6,
+        "auto_learn": true,
+        "popular_threshold": 5000,
+        "essential_tags": ["必装", "优化", "核心"]
+    },
+    "features": {
+        "introduction": true,
+        "search_mods": true,
+        "related_recommend": true,
+        "popular_list": true,
+        "essential_recommend": true
+    },
+    "prompt_templates": {
+        "recommend": "你是长途旅行(The Long Drive)游戏模组推荐专家。用户搜索关键词: {query}\n请推荐5个最相关的真实模组，返回JSON格式：\n[{\"name\": \"模组名\", \"description\": \"功能描述\", \"popularity\": \"高/中/低\", \"essential\": true/false, \"tags\": [\"标签\"]}]",
+        "introduce": "请详细介绍以下模组：{mod_name}\n包括功能特点、使用方法、推荐理由等。",
+        "search": "在以下模组列表中查找与\"{query}\"相关的模组：\n{mod_list}\n返回JSON格式的匹配结果。"
+    }
+}
