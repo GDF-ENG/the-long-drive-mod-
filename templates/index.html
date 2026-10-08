@@ -1,0 +1,2304 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TLD Mod Installer</title>
+  <link rel="icon" href="/static/tld.ico">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<script type="application/json" id="flask-data">
+{
+  "version": {{ version | tojson }},
+  "translations": {{ translations | tojson }}
+}
+</script>
+
+<script>
+(function(){
+  function loadScript(src){return new Promise(function(res,rej){var s=document.createElement('script');s.src=src;s.onload=res;s.onerror=rej;document.head.appendChild(s)})}
+  loadScript('/static/js/vue.global.prod.js').catch(function(){return loadScript('https://unpkg.com/vue@3/dist/vue.global.prod.js')}).then(function(){initVueApp()}).catch(function(){document.getElementById('app').innerHTML='<div class="vue-loading"><p>Vue.js 加载失败，请刷新重试。</p></div>'})
+})();
+</script>
+
+{% raw %}
+
+<div id="app" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
+
+  <!-- 移动端菜单按钮 -->
+  <button class="mobile-menu-btn" @click="mobileMenuOpen = !mobileMenuOpen">☰</button>
+  <div class="mobile-overlay" :class="{ active: mobileMenuOpen }" @click="mobileMenuOpen = false"></div>
+
+  <div class="vue-loading" v-if="!appReady">{{ t('loading') }}</div>
+
+  <template v-else>
+
+  <!-- ==================== 侧边栏 ==================== -->
+  <aside class="sidebar" :class="{ collapsed: sidebarCollapsed, 'mobile-open': mobileMenuOpen }">
+    <div class="sidebar-header">
+      <span class="logo-icon">🚗</span>
+      <span class="logo-text" v-show="!sidebarCollapsed || mobileMenuOpen">{{ t('app_title') }}</span>
+    </div>
+    <ul class="nav-list">
+      <li class="nav-item" :class="{ active: homeSection === 'mods' }" @click="switchHomeSection('mods')">
+        <svg viewBox="0 0 24 24"><path d="M4 4h4v4H4zm6 0h4v4h-4zm6 0h4v4h-4zM4 10h4v4H4zm6 0h4v4h-4zm6 0h4v4h-4zM4 16h4v4H4zm6 0h4v4h-4zm6 0h4v4h-4z"/></svg>
+        <span class="menu-text">{{ t('home_mods_title') }}</span>
+      </li>
+      <li class="nav-item" :class="{ active: homeSection === 'workshop' }" @click="switchHomeSection('workshop')">
+        <svg viewBox="0 0 24 24"><path d="M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.7C.4 7.1.9 10.1 2.9 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4z"/></svg>
+        <span class="menu-text">{{ t('workshop_tool') }}</span>
+      </li>
+      <li class="nav-item" :class="{ active: homeSection === 'modpacks' }" @click="switchHomeSection('modpacks')">
+        <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 9h-4v4h-2v-4H9v-2h4V5h2v4h4v2z"/></svg>
+        <span class="menu-text">{{ t('modpacks') }}</span>
+      </li>
+      <li class="nav-item" :class="{ active: homeSection === 'player_modpacks' }" @click="switchHomeSection('player_modpacks')">
+        <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+        <span class="menu-text">{{ t('player_modpacks') }}</span>
+      </li>
+      <li class="nav-item" :class="{ active: homeSection === 'ai' }" @click="switchHomeSection('ai')">
+        <svg viewBox="0 0 24 24"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>
+        <span class="menu-text">{{ t('ai_recommend') }}</span>
+      </li>
+      <li class="nav-item" :class="{ active: homeSection === 'forum' }" @click="switchHomeSection('forum')">
+        <svg viewBox="0 0 24 24"><path d="M21 6h-2v9H6v2c0 .55.45 1 1 1h11l4 4V7c0-.55-.45-1-1-1zm-4 6V3c0-.55-.45-1-1-1H3c-.55 0-1 .45-1 1v14l4-4h10c.55 0 1-.45 1-1z"/></svg>
+        <span class="menu-text">{{ t('forum') }}</span>
+      </li>
+      <li class="nav-item" :class="{ active: homeSection === 'installed' }" @click="switchHomeSection('installed')">
+        <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.49.49 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 00-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1115.6 12 3.6 3.6 0 0112 15.6z"/></svg>
+        <span class="menu-text">{{ t('installed_mods') }}</span>
+      </li>
+      <li class="nav-item" :class="{ active: homeSection === 'intel' }" @click="switchHomeSection('intel')">
+        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+        <span class="menu-text">{{ t('intel_section') }}</span>
+      </li>
+    </ul>
+    <div class="sidebar-footer">
+      <button class="sidebar-toggle" @click="sidebarCollapsed = !sidebarCollapsed">{{ sidebarCollapsed ? '▶' : '◀' }}</button>
+    </div>
+  </aside>
+
+  <!-- 右下角浮动按钮：仅保留设置与公告 -->
+  <div class="fab-stack">
+    <button class="fab" @click="openAnnouncement" :title="t('announcement_title')">
+      <svg viewBox="0 0 24 24"><path d="M18 11v2h4v-2h-4zm-2 6.61c.96.71 2.21 1.65 3.2 2.39.4-.53.8-1.07 1.2-1.6-.99-.74-2.24-1.68-3.2-2.4-.4.54-.8 1.08-1.2 1.61zM20.4 5.6c-.4-.53-.8-1.07-1.2-1.6-.99.74-2.24 1.68-3.2 2.4.4.53.8 1.07 1.2 1.6.96-.72 2.21-1.65 3.2-2.4zM4 9c-1.1 0-2 .9-2 2v2c0 1.1.9 2 2 2h1v4h2v-4h1l5 3V6L8 9H4zm11.5 3c0-1.33-.58-2.53-1.5-3.35v6.69c.92-.81 1.5-2.01 1.5-3.34z"/></svg>
+      <span class="fab-notice" v-if="hasAnnouncement">{{ announcementBadge }}</span>
+    </button>
+    <button class="fab fab-settings" @click="goSettings" :title="t('settings')">
+      <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.49.49 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 00-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1115.6 12 3.6 3.6 0 0112 15.6z"/></svg>
+    </button>
+  </div>
+
+  <!-- ==================== 主内容 ==================== -->
+  <main class="main-content" ref="mainContent" @scroll="handleScroll">
+    <div class="container">
+
+      <!-- ===== 顶栏：登录 / 注册 ===== -->
+      <div class="app-topbar">
+        <div class="topbar-left">
+          <span class="topbar-title">{{ t('app_title') }}</span>
+        </div>
+        <div class="topbar-right">
+          <div v-if="!currentUser" class="topbar-auth">
+            <button class="action-btn primary" @click="showLoginModal = true">{{ t('login') }}</button>
+            <button class="action-btn secondary" @click="showRegisterModal = true">{{ t('register') }}</button>
+          </div>
+          <div v-else class="topbar-user">
+            <span class="username">{{ currentUser.username }}</span>
+            <button class="action-btn secondary" @click="logout">{{ t('logout') }}</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== 首页 ===== -->
+      <div class="tab-content" :class="{ active: activeTab === 'home' }">
+        <div class="home-hero">
+          <h1 class="home-title">{{ t('home_title') }}</h1>
+          <p class="home-subtitle">{{ t('home_subtitle') }}</p>
+          <div class="home-badge-row">
+            <span class="home-badge accent">{{ t('badge_version', {ver: version}) }}</span>
+            <span class="home-badge">{{ t('badge_mods', {n: mods.length}) }}</span>
+            <span class="home-badge">{{ t('badge_non_official') }}</span>
+          </div>
+          <div class="modloader-notice">
+            <span class="modloader-icon">⚠️</span>
+            <span class="modloader-text">{{ t('modloader_required') }}</span>
+          </div>
+          <a class="site-entry" href="https://ksny2025.gitlab.io/TLDTool/" target="_blank" rel="noopener">
+            <span class="site-entry-label">{{ t('website') }}</span>
+            <span class="site-entry-hint">{{ t('website_hint') }}</span>
+            <span class="site-entry-arrow">→</span>
+          </a>
+        </div>
+
+        <div class="home-search-wrap">
+          <span class="home-search-icon">🔍</span>
+          <input type="text" class="home-search" v-model="homeSearchQuery"
+                 :placeholder="t('home_search_placeholder')" @keyup.enter="doHomeSearch()">
+          <button class="home-search-btn" @click="doHomeSearch()">{{ t('search') }}</button>
+        </div>
+
+        <div class="search-type-row">
+          <button class="search-type-btn" :class="{ active: homeSearchType === 'mods' }" @click="homeSearchType = 'mods'">{{ t('search_type_mods') }}</button>
+          <button class="search-type-btn" :class="{ active: homeSearchType === 'modpacks' }" @click="homeSearchType = 'modpacks'">{{ t('search_type_modpacks') }}</button>
+          <button class="search-type-btn" :class="{ active: homeSearchType === 'installed' }" @click="homeSearchType = 'installed'">{{ t('search_type_installed') }}</button>
+          <button class="search-type-btn" :class="{ active: homeSearchType === 'all' }" @click="homeSearchType = 'all'">{{ t('search_type_all') }}</button>
+        </div>
+
+        <h2 class="home-section-title">{{ t('intel_section') }}</h2>
+        <button class="intel-add-btn" @click="showIntelEditor = !showIntelEditor">
+          <span v-if="!showIntelEditor">+ {{ t('intel_publish') }}</span>
+          <span v-else>{{ t('cancel') }}</span>
+        </button>
+
+        <!-- 玩家自定义情报发布 -->
+        <div class="intel-editor" v-if="showIntelEditor">
+          <input type="text" v-model="intelForm.title" :placeholder="t('intel_title_ph')">
+          <textarea v-model="intelForm.content" :placeholder="t('intel_content_ph')" rows="3"></textarea>
+          <input type="text" v-model="intelForm.link" :placeholder="t('intel_link_ph')">
+          <button class="action-btn primary" @click="addIntel">{{ t('intel_submit') }}</button>
+        </div>
+
+        <!-- 玩家发布的自定义情报 -->
+        <div class="intel-custom-list" v-if="customIntel.length > 0">
+          <div class="intel-custom-card" v-for="(item, i) in customIntel" :key="i">
+            <div class="intel-custom-title">{{ item.title }}</div>
+            <div class="intel-custom-content">{{ item.content }}</div>
+            <a v-if="item.link" :href="item.link" target="_blank" rel="noopener" class="intel-custom-link">{{ item.link }}</a>
+            <button class="intel-del-btn" @click="removeIntel(i)">&times;</button>
+          </div>
+        </div>
+
+        <div class="intel-grid">
+          <div class="intel-card">
+            <div class="intel-label">{{ t('intel_installed') }}</div>
+            <div class="intel-value">{{ installedMods.length }}</div>
+            <div class="intel-hint">{{ t('intel_installed_hint') }}</div>
+          </div>
+          <div class="intel-card">
+            <div class="intel-label">{{ t('intel_available') }}</div>
+            <div class="intel-value">{{ mods.length }}</div>
+            <div class="intel-hint">{{ t('intel_available_hint') }}</div>
+          </div>
+          <div class="intel-card">
+            <div class="intel-label">{{ t('intel_modpacks') }}</div>
+            <div class="intel-value">{{ modpacks.length }}</div>
+            <div class="intel-hint">{{ t('intel_modpacks_hint') }}</div>
+          </div>
+          <div class="intel-card">
+            <div class="intel-label">{{ t('intel_source') }}</div>
+            <div class="intel-value" style="font-size:15px">{{ currentSourceName }}</div>
+            <div class="intel-hint">{{ t('intel_source_hint') }}</div>
+          </div>
+        </div>
+
+        <!-- ===== 功能分区切换 ===== -->
+        <div class="section-tabs">
+          <button class="section-tab" :class="{ active: homeSection === 'mods' }" @click="switchHomeSection('mods')">{{ t('home_mods_title') }}</button>
+          <button class="section-tab" :class="{ active: homeSection === 'workshop' }" @click="switchHomeSection('workshop')">{{ t('workshop_tool') }}</button>
+          <button class="section-tab" :class="{ active: homeSection === 'modpacks' }" @click="switchHomeSection('modpacks')">{{ t('modpacks') }}</button>
+          <button class="section-tab" :class="{ active: homeSection === 'player_modpacks' }" @click="switchHomeSection('player_modpacks')">{{ t('player_modpacks') }}</button>
+          <button class="section-tab" :class="{ active: homeSection === 'user_mods' }" @click="switchHomeSection('user_mods')">{{ t('user_mods') }}</button>
+          <button class="section-tab" :class="{ active: homeSection === 'ai' }" @click="switchHomeSection('ai')">{{ t('ai_recommend') }}</button>
+          <button class="section-tab" :class="{ active: homeSection === 'forum' }" @click="switchHomeSection('forum')">{{ t('forum') }}</button>
+          <button class="section-tab" :class="{ active: homeSection === 'installed' }" @click="switchHomeSection('installed')">{{ t('installed_mods') }}</button>
+        </div>
+
+        <!-- ===== 车间工具（独立分区）===== -->
+      <div class="home-section-body" v-show="homeSection === 'workshop'">
+        <div class="workshop-panel">
+          <div class="workshop-head">
+            <div class="workshop-icon">🛠️</div>
+            <div>
+              <h2 class="workshop-title">{{ t('workshop_title') }}</h2>
+              <p class="workshop-sub">{{ t('workshop_desc') }}</p>
+            </div>
+          </div>
+
+          <div class="workshop-feats">
+            <div class="workshop-feat">📁 {{ t('workshop_feat1') }}</div>
+            <div class="workshop-feat">🔍 {{ t('workshop_feat2') }}</div>
+            <div class="workshop-feat">🎮 {{ t('workshop_feat3') }}</div>
+          </div>
+
+          <div class="workshop-steam" v-if="steamStatus !== null">
+            <span v-if="steamStatus.installed">✅ {{ t('steam_found', {path: steamStatus.path}) }}</span>
+            <span v-else>⚠️ {{ t('steam_not_found') }}</span>
+          </div>
+
+          <div class="workshop-actions">
+            <button class="action-btn primary" @click="downloadWorkshopTool">📥 {{ t('workshop_download') }}</button>
+            <button class="action-btn secondary" @click="checkSteam">🔍 {{ t('steam_check') }}</button>
+          </div>
+
+          <p class="workshop-tip">{{ t('workshop_tip') }}</p>
+        </div>
+      </div>
+
+        <!-- ===== 玩家上传模组 ===== -->
+      <div class="home-section-body" v-show="homeSection === 'user_mods'">
+        <div class="top-bar">
+          <h2>{{ t('user_mods') }}</h2>
+        </div>
+        <div class="filters">
+          <button class="action-btn primary" @click="showUploadModModal = true" :disabled="!currentUser">{{ t('upload_mod') }}</button>
+          <button class="action-btn secondary" @click="loadUserMods()">{{ t('refresh') }}</button>
+        </div>
+        <div class="info" v-if="!currentUser" style="margin-bottom:14px;">{{ t('user_mods_login_hint') }}</div>
+        <div v-if="userModsLoading" class="loading">{{ t('loading') }}</div>
+        <div v-else-if="userMods.length === 0" class="info">{{ t('no_user_mods') }}</div>
+        <div v-else class="mod-grid">
+          <div class="mod-card" v-for="m in userMods" :key="m.id">
+            <div class="mod-image">
+              <img :src="m.PictureLink || ''" :alt="m.Name" loading="lazy" @error="imgFallback">
+            </div>
+            <div class="mod-info">
+              <h3>{{ m.Name }}</h3>
+              <div class="author" v-if="m.author">{{ t('author') }}{{ m.author }}</div>
+              <div class="version">{{ t('version') }}{{ m.Version }}</div>
+              <div class="desc">{{ m.description }}</div>
+              <div class="mod-actions">
+                <a class="btn-install" v-if="m.file_name" :href="'/api/user-mod-file/' + m.file_name" target="_blank" rel="noopener">{{ t('download') }}</a>
+                <a class="btn-install" v-else-if="m.DownloadLink" :href="m.DownloadLink" target="_blank" rel="noopener">{{ t('download') }}</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+        <!-- ===== 以下为整合进来的功能区 ===== -->
+
+      <div class="home-section-body" v-show="homeSection === 'mods'">
+        <div class="top-bar">
+          <div class="source-selector">
+            <label>{{ t('data_source') }}</label>
+            <select v-model.number="sourceIndex" @change="loadMods()">
+              <option v-for="(s, i) in sources" :key="i" :value="i">{{ s.name }}</option>
+            </select>
+            <label><input type="checkbox" v-model="strictMode" @change="loadMods()"> {{ t('strict_mode') }}</label>
+          </div>
+          <div class="view-toggle">
+            <button class="view-btn" :class="{ active: viewMode === 'grid' }" @click="viewMode = 'grid'">{{ t('grid_view') }}</button>
+            <button class="view-btn" :class="{ active: viewMode === 'list' }" @click="viewMode = 'list'">{{ t('list_view') }}</button>
+          </div>
+        </div>
+        <div class="filters">
+          <input class="search-input" v-model="searchQuery" :placeholder="t('search_placeholder')">
+          <select class="category-select" v-model="selectedCategory">
+            <option value="">{{ t('all_categories') }}</option>
+            <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
+          </select>
+          <button class="action-btn secondary" @click="selectAll('browse')">{{ t('select_all') }}</button>
+          <button class="action-btn secondary" @click="invertSelection('browse')">{{ t('invert_selection') }}</button>
+          <button class="action-btn secondary" @click="clearSelection('browse')">{{ t('clear_selection') }}</button>
+        </div>
+        <div v-if="loading" class="loading">{{ t('loading') }}</div>
+        <div v-else-if="filteredMods.length === 0" class="info">{{ t('no_mods_found') }}</div>
+        <div v-else :class="viewMode === 'grid' ? 'mod-grid' : 'mod-list'">
+          <div v-for="mod in filteredMods" :key="mod.FileName" class="mod-card-wrapper">
+            <input type="checkbox" class="multi-check" :value="mod.FileName" v-model="selectedBrowse">
+            <div class="mod-card" :class="{ 'has-conflict': hasConflict(mod.Name) }" @click="openDetail(mod)">
+              <div class="mod-image">
+                <img :src="mod.PictureLink || ''" :alt="mod.Name" loading="lazy" @error="imgFallback">
+              </div>
+              <div class="mod-info">
+                <h3>{{ mod.Name }}</h3>
+                <div class="author">{{ t('author') }}{{ mod.Author }}</div>
+                <div class="version">{{ t('version') }}{{ mod.Version }}</div>
+                <div>
+                  <span v-if="mod.is_installed" class="mod-tag installed-tag">{{ t('installed') }}</span>
+                  <span v-if="mod.Dependency" class="mod-tag dep">{{ t('dep_tag') }}</span>
+                  <span v-if="hasConflict(mod.Name)" class="mod-tag conflict">{{ t('conflict_tag') }}</span>
+                </div>
+                <div class="desc">{{ mod.Description }}</div>
+                <div class="mod-actions" @click.stop>
+                  <button v-if="!mod.is_installed" class="btn-install" @click="doDownload(mod)" :disabled="mod._busy">{{ mod._busy ? '...' : t('download') }}</button>
+                  <button v-else class="btn-uninstall" @click="doUninstall(mod)">{{ t('uninstall') }}</button>
+                </div>
+              </div>
+
+        </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="home-section-body" v-show="homeSection === 'modpacks'">
+        <div class="top-bar">
+          <div class="source-selector">
+            <label>{{ t('data_source') }}</label>
+            <select v-model.number="modpackSourceIndex" @change="loadModpacks()">
+              <option v-for="(s, i) in sources" :key="i" :value="i">{{ s.name }}</option>
+            </select>
+          </div>
+          <div class="view-toggle">
+            <button class="view-btn" :class="{ active: modpackViewMode === 'grid' }" @click="modpackViewMode = 'grid'">{{ t('grid_view') }}</button>
+            <button class="view-btn" :class="{ active: modpackViewMode === 'list' }" @click="modpackViewMode = 'list'">{{ t('list_view') }}</button>
+          </div>
+        </div>
+        <div class="filters">
+          <button class="action-btn primary" @click="exportModpack">{{ t('export') }}</button>
+          <label class="action-btn secondary" style="cursor:pointer;">{{ t('import') }}<input type="file" accept=".txt" @change="importModpack" style="display:none"></label>
+        </div>
+        <div v-if="modpacksLoading" class="loading">{{ t('loading') }}</div>
+        <div v-else-if="modpacks.length === 0" class="info">{{ t('no_mods_found') }}</div>
+        <div v-else :class="modpackViewMode === 'grid' ? 'mod-grid' : 'mod-list'">
+          <div v-for="pack in modpacks" :key="pack.Name || pack.Link" class="mod-card" @click="openDetail(pack)">
+            <div class="mod-image">
+              <img :src="pack.PictureLink || ''" :alt="pack.Name" loading="lazy" @error="imgFallback">
+            </div>
+            <div class="mod-info">
+              <h3>{{ pack.Name }}</h3>
+              <div class="author" v-if="pack.Author">{{ t('author') }}{{ pack.Author }}</div>
+              <div class="desc">{{ pack.Description }}</div>
+              <div class="mod-actions" @click.stop>
+                <button class="btn-install" @click="doDownloadModpack(pack)">{{ t('download') }}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="home-section-body" v-show="homeSection === 'player_modpacks'">
+        <div class="top-bar">
+          <h2>{{ t('player_modpacks') }}</h2>
+          <div class="view-toggle">
+            <button class="view-btn" :class="{ active: playerModpackViewMode === 'grid' }" @click="playerModpackViewMode = 'grid'">{{ t('grid_view') }}</button>
+            <button class="view-btn" :class="{ active: playerModpackViewMode === 'list' }" @click="playerModpackViewMode = 'list'">{{ t('list_view') }}</button>
+          </div>
+        </div>
+        <div class="filters">
+          <button class="action-btn primary" @click="showUploadModal = true" :disabled="!currentUser">{{ t('upload_modpack') }}</button>
+          <button class="action-btn secondary" @click="loadPlayerModpacks()">{{ t('refresh') }}</button>
+        </div>
+        <div v-if="playerModpacksLoading" class="loading">{{ t('loading') }}</div>
+        <div v-else-if="playerModpacks.length === 0" class="info">{{ t('no_player_modpacks') }}</div>
+        <div v-else :class="playerModpackViewMode === 'grid' ? 'mod-grid' : 'mod-list'">
+          <div v-for="pack in playerModpacks" :key="pack.id" class="mod-card">
+            <div class="mod-image" v-if="pack.picture_url">
+              <img :src="pack.picture_url" :alt="pack.name" loading="lazy" @error="imgFallback">
+            </div>
+            <div class="mod-image placeholder" v-else>
+              <span>📦</span>
+            </div>
+            <div class="mod-info">
+              <h3>{{ pack.name }}</h3>
+              <div class="author">{{ t('author') }}{{ pack.author }}</div>
+              <div class="version">{{ t('downloads') }}{{ pack.download_count }}</div>
+              <div class="desc">{{ pack.description }}</div>
+              <div v-if="pack.video_url" class="video-link">
+                <a :href="pack.video_url" target="_blank">🎬 {{ t('watch_video') }}</a>
+              </div>
+              <div v-if="pack.tutorial_url" class="tutorial-link">
+                <a :href="pack.tutorial_url" target="_blank">📖 {{ t('tutorial') }}</a>
+              </div>
+              <div class="mod-actions" @click.stop>
+                <button class="btn-install" @click="downloadPlayerModpack(pack)">{{ t('download') }}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="home-section-body" v-show="homeSection === 'ai'">
+        <div class="ai-recommend-container">
+          <!-- AI自我介绍卡片 -->
+          <div class="ai-intro-card" style="background:linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%);padding:25px;border-radius:var(--radius-lg);margin-bottom:25px;">
+            <div style="display:flex;align-items:flex-start;">
+              <div style="font-size:4em;margin-right:20px;">🤖</div>
+              <div style="flex:1;">
+                <h3 style="color:#fff;font-size:1.3em;margin-bottom:10px;">{{ aiConfig.ai?.name || 'AI模组推荐助手' }}</h3>
+                <p style="color:rgba(255,255,255,0.9);line-height:1.6;">{{ aiConfig.ai?.intro || '大家好！我是AI模组推荐助手...' }}</p>
+                <div style="display:flex;gap:10px;margin-top:15px;">
+                  <span v-for="(feature, idx) in aiConfig.ai?.features" :key="idx" style="padding:5px 12px;background:rgba(255,255,255,0.2);color:#fff;border-radius:var(--radius-sm);font-size:0.85em;">{{ feature }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 搜索区域 -->
+          <div class="ai-search-area" style="background:var(--card-bg);padding:25px;border-radius:var(--radius-lg);margin-bottom:25px;">
+            <div style="display:flex;gap:15px;align-items:center;">
+              <div style="flex:1;">
+                <label style="color:var(--text-muted);display:block;margin-bottom:8px;">{{ t('ai_search_label') }}</label>
+                <input 
+                  type="text" 
+                  v-model="aiSearchQuery" 
+                  :placeholder="t('ai_search_placeholder')"
+                  @keyup.enter="doAIRecommend"
+                  style="width:100%;padding:15px;border-radius:var(--radius-md);border:2px solid var(--border-color);background:var(--bg-dark);color:var(--text-light);font-size:1.1em;"
+                >
+              </div>
+              <div style="display:flex;flex-direction:column;gap:10px;">
+                <button 
+                  class="action-btn primary" 
+                  @click="doAIRecommend" 
+                  :disabled="aiLoading"
+                  style="padding:15px 30px;font-size:1.1em;"
+                >
+                  <span v-if="aiLoading">{{ t('ai_thinking') }}</span>
+                  <span v-else>{{ t('ai_recommend_btn') }}</span>
+                </button>
+                <button 
+                  class="action-btn secondary" 
+                  @click="getPopularMods"
+                  :disabled="aiLoading"
+                  style="padding:10px 20px;font-size:0.9em;"
+                >
+                  {{ t('ai_popular_mods') }}
+                </button>
+              </div>
+            </div>
+            
+            <!-- 快捷搜索标签 -->
+            <div style="margin-top:15px;">
+              <span style="color:var(--text-muted);font-size:0.9em;margin-right:10px;">{{ t('ai_quick_search') }}:</span>
+              <button 
+                v-for="tag in aiQuickTags" 
+                :key="tag"
+                @click="aiSearchQuery = tag; doAIRecommend()"
+                style="padding:5px 15px;margin-right:10px;margin-bottom:10px;background:rgba(76,175,80,0.2);color:var(--success);border:none;border-radius:var(--radius-sm);cursor:pointer;"
+              >
+                {{ tag }}
+              </button>
+            </div>
+          </div>
+
+          <!-- 加载状态 -->
+          <div v-if="aiLoading" class="ai-loading" style="text-align:center;padding:50px;">
+            <div style="display:inline-block;width:50px;height:50px;border:5px solid var(--border-color);border-top:5px solid var(--accent);border-radius:50%;animation:spin 1s linear infinite;"></div>
+            <p style="color:var(--text-muted);margin-top:20px;font-size:1.1em;">{{ t('ai_analyzing') }}</p>
+          </div>
+
+          <!-- 错误提示 -->
+          <div v-if="aiError && !aiLoading" class="ai-error" style="background:rgba(244,67,54,0.1);border:1px solid var(--danger);border-radius:var(--radius-md);padding:20px;text-align:center;color:var(--danger);">
+            <p>{{ aiError }}</p>
+            <button class="action-btn secondary" @click="doAIRecommend" style="margin-top:15px;">{{ t('retry') }}</button>
+          </div>
+
+          <!-- 推荐结果 -->
+          <div v-if="aiRecommendations.length > 0 && !aiLoading" class="ai-results">
+            <h2 style="color:var(--text-light);margin-bottom:20px;">{{ t('ai_results') }} ({{ aiRecommendations.length }})</h2>
+            <div class="mod-grid">
+              <div 
+                v-for="(rec, index) in aiRecommendations" 
+                :key="index" 
+                class="mod-card"
+                style="background:var(--card-bg);border-radius:var(--radius-lg);overflow:hidden;border:1px solid var(--border-color);transition:transform 0.3s, box-shadow 0.3s;"
+              >
+                <div style="padding:20px;">
+                  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:15px;">
+                    <div>
+                      <h3 style="color:var(--accent);font-size:1.2em;margin-bottom:5px;">{{ rec.name }}</h3>
+                      <div style="display:flex;gap:10px;">
+                        <span style="color:var(--warning);font-size:0.85em;">⭐ {{ rec.popularity }}</span>
+                        <span style="color:var(--info);font-size:0.85em;">📥 {{ rec.downloads }}</span>
+                        <span v-if="rec.essential" style="color:#ff6b6b;font-size:0.85em;">🔥 {{ t('ai_essential') }}</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <p style="color:var(--text-light);line-height:1.6;margin-bottom:15px;">{{ rec.description }}</p>
+                  
+                  <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:15px;">
+                    <span 
+                      v-for="(tag, tidx) in rec.tags" 
+                      :key="tidx" 
+                      style="padding:4px 12px;background:rgba(76,175,80,0.15);color:var(--success);border-radius:var(--radius-sm);font-size:0.85em;"
+                    >
+                      {{ tag }}
+                    </span>
+                  </div>
+                  
+                  <!-- 两种下载方式 -->
+                  <div style="display:flex;gap:10px;">
+                    <button 
+                      class="action-btn primary" 
+                      @click="searchModByName(rec.name)"
+                      style="flex:1;padding:10px;"
+                    >
+                      🔍 {{ t('find_and_download') }}
+                    </button>
+                    <button 
+                      class="action-btn secondary" 
+                      @click="directDownloadMod(rec.name)"
+                      style="flex:1;padding:10px;"
+                    >
+                      ⬇️ 直接下载
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 空状态 -->
+          <div v-if="aiRecommendations.length === 0 && !aiLoading && !aiError" class="ai-empty" style="text-align:center;padding:60px;">
+            <div style="font-size:4em;margin-bottom:20px;">🤔</div>
+            <h3 style="color:var(--text-light);margin-bottom:10px;">{{ t('ai_empty_title') }}</h3>
+            <p style="color:var(--text-muted);">{{ t('ai_empty_desc') }}</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="home-section-body" v-show="homeSection === 'forum'">
+        <div class="top-bar">
+          <h2>{{ t('forum') }}</h2>
+          <button class="action-btn primary" @click="showPostModal = true" :disabled="!currentUser">{{ t('create_post') }}</button>
+        </div>
+        <div class="filters">
+          <select class="category-select" v-model="forumModpackFilter" @change="loadForumPosts()">
+            <option value="">{{ t('all_modpacks') }}</option>
+            <option v-for="pack in playerModpacks" :key="pack.id" :value="pack.id">{{ pack.name }}</option>
+          </select>
+          <button class="action-btn secondary" @click="loadForumPosts()">{{ t('refresh') }}</button>
+        </div>
+        <div v-if="forumLoading" class="loading">{{ t('loading') }}</div>
+        <div v-else-if="forumPosts.length === 0" class="info">{{ t('no_posts') }}</div>
+        <div v-else class="forum-posts">
+          <div v-for="post in forumPosts" :key="post.id" class="forum-post">
+            <div class="post-header">
+              <span class="post-author">{{ post.username }}</span>
+              <span class="post-date">{{ formatDate(post.created_at) }}</span>
+              <span class="post-modpack" v-if="post.modpack_name">📦 {{ post.modpack_name }}</span>
+            </div>
+            <div class="post-content">{{ post.content }}</div>
+            <div class="post-media" v-if="post.image_url || post.video_url">
+              <img v-if="post.image_url" :src="post.image_url" alt="image" @error="imgFallback">
+              <a v-if="post.video_url" :href="post.video_url" target="_blank" class="video-link">🎬 {{ t('watch_video') }}</a>
+            </div>
+            <div class="post-footer">
+              <button class="action-btn secondary" @click="likePost(post)">👍 {{ post.likes_count }}</button>
+              <button class="action-btn secondary" @click="openComments(post)">💬 {{ post.comment_count }}</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="home-section-body" v-show="homeSection === 'installed'">
+        <div class="top-bar">
+          <div class="source-selector">
+            <label>{{ t('data_source') }}</label>
+            <select v-model.number="manageSourceIndex" @change="loadMods()">
+              <option v-for="(s, i) in sources" :key="i" :value="i">{{ s.name }}</option>
+            </select>
+          </div>
+          <div class="view-toggle">
+            <button class="view-btn" :class="{ active: manageViewMode === 'grid' }" @click="manageViewMode = 'grid'">{{ t('grid_view') }}</button>
+            <button class="view-btn" :class="{ active: manageViewMode === 'list' }" @click="manageViewMode = 'list'">{{ t('list_view') }}</button>
+          </div>
+        </div>
+        <!-- 冲突警告 -->
+        <div v-if="installedConflicts.length > 0" style="margin-bottom:15px;">
+          <div v-for="c in installedConflicts" :key="c.reason" style="background:rgba(244,67,54,0.1);border:1px solid rgba(244,67,54,0.3);border-radius:var(--radius-md);padding:10px 15px;margin-bottom:8px;">
+            <strong style="color:var(--danger);">{{ t('conflict_detect') }}</strong>
+            <span style="color:#ddd;">{{ c.mods.join(' ↔ ') }} — {{ c.reason }}</span>
+          </div>
+        </div>
+        <div class="filters">
+          <button class="action-btn secondary" @click="selectAll('manage')">{{ t('select_all') }}</button>
+          <button class="action-btn secondary" @click="invertSelection('manage')">{{ t('invert_selection') }}</button>
+          <button class="action-btn secondary" @click="clearSelection('manage')">{{ t('clear_selection') }}</button>
+        </div>
+        <div v-if="loading" class="loading">{{ t('loading') }}</div>
+        <div v-else-if="installedMods.length === 0" class="info">{{ t('no_installed_mods') }}</div>
+        <div v-else :class="manageViewMode === 'grid' ? 'mod-grid' : 'mod-list'">
+          <div v-for="mod in installedMods" :key="mod.Name || mod.FileName" class="mod-card-wrapper">
+            <input type="checkbox" class="multi-check" :value="mod.Name || mod.FileName" v-model="selectedManage">
+            <div class="mod-card" :class="{ 'has-conflict': hasConflict(mod.Name) }" @click="openDetail(mod)">
+              <div class="mod-image">
+                <img :src="mod.PictureLink || ''" :alt="mod.Name" loading="lazy" @error="imgFallback">
+              </div>
+              <div class="mod-info">
+                <h3>{{ mod.Name }}</h3>
+                <div class="version">{{ t('version') }}{{ mod.installed_version || mod.Version }}</div>
+                <div>
+                  <span v-if="mod.Dependency" class="mod-tag dep">{{ t('dep_tag') }}</span>
+                  <span v-if="hasConflict(mod.Name)" class="mod-tag conflict">{{ t('conflict_tag') }}</span>
+                </div>
+                <div class="desc">{{ mod.Description }}</div>
+                <div class="mod-actions" @click.stop>
+                  <button class="btn-uninstall" @click="doUninstallByName(mod.Name || mod.FileName)">{{ t('uninstall') }}</button>
+                  <button class="btn-update" :disabled="mod.installed_version === mod.Version" @click="doUpdateByName(mod.Name)">{{ mod.installed_version === mod.Version ? t('latest') : t('update') }}</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      </div>
+
+      <!-- ===== 浏览模组 ===== -->
+
+      <!-- ===== 模组包 ===== -->
+
+      <!-- ===== 玩家整合包 ===== -->
+
+      <!-- ===== 论坛 ===== -->
+
+      <!-- ===== 已安装 ===== -->
+
+      <!-- ===== 设置 ===== -->
+      <div class="tab-content" :class="{ active: activeTab === 'settings' }">
+        <!-- 固定在顶部的关闭栏：设置页很长，必须能一键回到首页 -->
+        <div class="settings-close-bar">
+          <button class="action-btn primary" @click="goBackFromSettings">← {{ t('back_to_home') }}</button>
+        </div>
+        <div class="settings-section">
+          <h3>{{ t('update_settings') }}</h3>
+          <div class="setting-row"><label>{{ t('manual_check') }}</label><button class="action-btn primary" @click="checkUpdate(true)" :disabled="checkingUpdate">{{ checkingUpdate ? t('checking_update') : t('manual_check') }}</button></div>
+          <div class="setting-row"><label>{{ t('enable_proxy') }}</label><input type="checkbox" v-model="config.use_proxy"><span style="color:#888;font-size:0.8rem;">{{ t('proxy_recommend') }}</span></div>
+          <div class="setting-row"><label>{{ t('backup_filename') }}</label><input type="text" v-model="config.backup_name" :placeholder="t('backup_placeholder')"></div>
+        </div>
+        <div class="settings-section">
+          <h3>{{ t('ui_theme') }}</h3>
+          <div class="setting-row">
+            <label>{{ t('theme_mode') }}</label>
+            <select v-model="config.theme_mode">
+              <option value="dark">{{ t('dark_mode') }}</option>
+              <option value="light">{{ t('light_mode') }}</option>
+              <option value="auto">{{ t('auto_system') }}</option>
+            </select>
+          </div>
+          <div class="setting-row">
+            <label>{{ t('accent_color') }}</label>
+            <input type="color" v-model="config.accent_color">
+          </div>
+          <div class="setting-row">
+            <label>{{ t('bg_color') }}</label>
+            <input type="color" v-model="config.bg_color">
+          </div>
+          <div class="setting-row">
+            <label>{{ t('font_size') }}</label>
+            <select v-model="config.font_size">
+              <option value="small">{{ t('small') }}</option>
+              <option value="medium">{{ t('medium') }}</option>
+              <option value="large">{{ t('large') }}</option>
+            </select>
+          </div>
+          <div class="setting-row">
+            <label>{{ t('view_style') }}</label>
+            <select v-model="config.view_style">
+              <option value="card">{{ t('card_view') }}</option>
+              <option value="compact">{{ t('compact_view') }}</option>
+            </select>
+          </div>
+          <div class="setting-row">
+            <button class="action-btn secondary" @click="resetTheme">{{ t('reset_default') }}</button>
+            <button class="action-btn primary" @click="applyTheme">{{ t('apply_theme') }}</button>
+          </div>
+        </div>
+        <div class="settings-section">
+          <h3>{{ t('language_settings') }}</h3>
+          <div class="setting-row"><label>{{ t('ui_language') }}</label><select v-model="currentLang" @change="changeLanguage"><option value="auto">{{ t('auto_system') }}</option><option value="zh">中文</option><option value="en">English</option><option value="fr">Français</option><option value="ar">العربية</option><option value="es">Español</option><option value="ru">Русский</option></select></div>
+        </div>
+        <div class="settings-section">
+          <h3>{{ t('launch_settings') }}</h3>
+          <div class="setting-row"><label>{{ t('game_exe_path') }}</label><input type="text" v-model="config.exe_path" :placeholder="t('exe_path_placeholder')"><button class="action-btn secondary" @click="browseExe">{{ t('browse') }}</button></div>
+        </div>
+        <div class="settings-section">
+          <h3>{{ t('mods_path_title') }}</h3>
+          <div class="setting-row"><label>{{ t('mods_path') }}</label><input type="text" v-model="config.mods_path" :placeholder="t('mods_path_placeholder')"><button class="action-btn secondary" @click="browseModsFolder">{{ t('browse') }}</button></div>
+        </div>
+        <button class="action-btn primary" @click="saveConfig" style="margin-top:10px;">{{ t('save_settings') }}</button>
+      </div>
+
+      <!-- ===== AI推荐 ===== -->
+
+      <!-- ===== 关于 ===== -->
+      <div class="tab-content" :class="{ active: activeTab === 'about' }">
+        <div class="settings-section">
+          <h3>{{ t('about_title') }}</h3>
+          <p style="line-height:1.8;color:#ccc;">
+            <strong>TLD 网页模组安装器</strong><br>The Long Drive Mod Installer<br>版本：{{ version }}<br>开发者：而不同<br>QQ群：365352522<br>Email：246717952@qq.com<br>许可证：AGPL-3.0
+          </p>
+        </div>
+        
+        <!-- 使用工具 -->
+        
+        <div class="settings-section">
+          <h3>{{ t('license') }}</h3>
+          <textarea style="width:100%;height:200px;background:var(--bg-color);color:#ccc;border:1px solid var(--input-border);border-radius:var(--radius-md);padding:10px;resize:vertical;font-size:0.85rem;" readonly>{{ licenseText }}</textarea>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- ==================== 模组详情模态框 ==================== -->
+  <div class="modal" v-if="showDetailModal" @click.self="showDetailModal = false">
+    <div class="modal-content">
+      <span class="close" @click="showDetailModal = false">&times;</span>
+      <div class="modal-image" v-if="detailMod">
+        <img :src="detailMod.PictureLink || ''" :alt="detailMod.Name" @error="imgFallback">
+      </div>
+      <div v-if="detailMod">
+        <h2 style="color:var(--accent);">{{ detailMod.Name }}</h2>
+        <div v-if="translatedName && translatedName !== detailMod.Name" class="auto-translated-name">
+          <span class="zh-tag">中文</span>{{ translatedName }}
+        </div>
+        <p style="color:#888;margin:5px 0;">{{ t('author') }}{{ detailMod.Author }}</p>
+        <p style="color:#888;margin:5px 0;">{{ t('version') }}{{ detailMod.Version }}</p>
+        <p style="color:#888;margin:5px 0;" v-if="detailMod.Category">{{ t('category_label') }}{{ detailMod.Category }}</p>
+
+        <!-- 依赖信息 -->
+        <div v-if="detailDepInfo.length > 0" class="dep-list">
+          <p style="color:var(--info);font-weight:bold;margin:8px 0 4px;">{{ t('dep_title') }}</p>
+          <div v-for="dep in detailDepInfo" :key="dep.name" class="dep-item">
+            <span>{{ dep.name }} <span style="color:#888;">v{{ dep.version }}</span></span>
+            <span class="dep-status" :class="{ needed: !dep.is_installed }">{{ dep.is_installed ? t('dep_installed') : t('dep_needed') }}</span>
+          </div>
+        </div>
+
+        <!-- 冲突信息 -->
+        <div v-if="detailConflicts.length > 0" class="conflict-list">
+          <p style="color:var(--danger);font-weight:bold;margin:8px 0 4px;">{{ t('conflict_title') }}</p>
+          <div v-for="c in detailConflicts" :key="c.reason" class="conflict-item">
+            <span>{{ c.mods.join(' ↔ ') }} — {{ c.reason }}</span>
+          </div>
+        </div>
+
+        <p style="color:#888;margin:5px 0;" v-if="detailMod.Dependency && detailDepInfo.length === 0">{{ t('dep_fallback') }}{{ detailMod.Dependency }}</p>
+        <div class="modal-description">{{ detailMod.Description }}</div>
+        <div class="modal-description auto-translated-desc" v-if="translatedDesc">
+          <span class="zh-tag">中文简介</span><br>
+          {{ translatedDesc }}
+        </div>
+        <div class="modal-description" v-if="detailMod.Changelog" style="margin-top:8px;"><strong>{{ t('changelog_label') }}</strong><br>{{ detailMod.Changelog }}</div>
+        <div class="modal-actions">
+          <button v-if="!detailMod.is_installed" class="btn-install" @click="doDownload(detailMod); showDetailModal = false">{{ t('download') }}</button>
+          <button v-else class="btn-uninstall" @click="doUninstall(detailMod); showDetailModal = false">{{ t('uninstall') }}</button>
+          <button class="action-btn secondary" @click="translateModDesc(detailMod)" :disabled="translatingDesc">
+            {{ translatingDesc ? t('translating') : t('translate') }}
+          </button>
+        </div>
+        <div v-if="translatedDesc" class="modal-description" style="margin-top:10px;background:rgba(76,175,80,0.1);border:1px solid rgba(76,175,80,0.3);border-radius:var(--radius-md);padding:10px;">
+          <strong style="color:var(--success);">{{ t('translated_text') }}</strong><br>
+          {{ translatedDesc }}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 操作结果模态框 ==================== -->
+  <div class="modal" v-if="showResultModal" @click.self="showResultModal = false">
+    <div class="modal-content">
+      <span class="close" @click="showResultModal = false">&times;</span>
+      <h2 style="color:var(--accent);">{{ t('operation_result') }}</h2>
+      <div class="modal-description" style="max-height:400px;">
+        <div v-for="(r, i) in resultLines" :key="i" style="padding:3px 0;white-space:pre-wrap;">{{ r }}</div>
+      </div>
+      <div class="modal-actions"><button class="action-btn secondary" @click="showResultModal = false">{{ t('close') }}</button></div>
+    </div>
+  </div>
+
+  <!-- ==================== 登录模态框 ==================== -->
+  <div class="modal" v-if="showLoginModal" @click.self="showLoginModal = false">
+    <div class="modal-content">
+      <span class="close" @click="showLoginModal = false">&times;</span>
+      <h2 style="color:var(--accent);">{{ t('login') }}</h2>
+      <div class="form-group">
+        <label>{{ t('username') }}</label>
+        <input type="text" v-model="loginForm.username" :placeholder="t('username_placeholder')">
+      </div>
+      <div class="form-group">
+        <label>{{ t('password') }}</label>
+        <input type="password" v-model="loginForm.password" :placeholder="t('password_placeholder')" @keyup.enter="doLogin">
+      </div>
+      <div class="modal-actions">
+        <button class="action-btn primary" @click="doLogin" :disabled="loginLoading">{{ loginLoading ? t('logging_in') : t('login') }}</button>
+        <button class="action-btn secondary" @click="showLoginModal = false">{{ t('cancel') }}</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 注册模态框 ==================== -->
+  <div class="modal" v-if="showRegisterModal" @click.self="showRegisterModal = false">
+    <div class="modal-content">
+      <span class="close" @click="showRegisterModal = false">&times;</span>
+      <h2 style="color:var(--accent);">{{ t('register') }}</h2>
+      <div class="form-group">
+        <label>{{ t('username') }}</label>
+        <input type="text" v-model="registerForm.username" :placeholder="t('username_placeholder')">
+      </div>
+      <div class="form-group">
+        <label>{{ t('password') }}</label>
+        <input type="password" v-model="registerForm.password" :placeholder="t('password_placeholder')">
+      </div>
+      <div class="form-group">
+        <label>{{ t('confirm_password') }}</label>
+        <input type="password" v-model="registerForm.confirmPassword" :placeholder="t('confirm_password_placeholder')" @keyup.enter="doRegister">
+      </div>
+      <div class="modal-actions">
+        <button class="action-btn primary" @click="doRegister" :disabled="registerLoading">{{ registerLoading ? t('registering') : t('register') }}</button>
+        <button class="action-btn secondary" @click="showRegisterModal = false">{{ t('cancel') }}</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 公告弹窗 ==================== -->
+  <div class="modal announcement-modal" v-if="showAnnouncementModal" style="z-index:9999;">
+    <div class="modal-content announcement-content" style="max-width:600px;max-height:80vh;">
+      <h2 style="color:var(--accent);text-align:center;">📢 {{ t('announcement_title') }}</h2>
+      <div class="announcement-header" v-if="currentAnnouncement">
+        <span class="announcement-author">👤 {{ currentAnnouncement.author }}</span>
+        <span class="announcement-date">{{ formatDate(currentAnnouncement.created_at) }}</span>
+      </div>
+      <div class="announcement-body" v-if="currentAnnouncement">
+        <h3 style="color:#fff;margin-bottom:15px;">{{ currentAnnouncement.title }}</h3>
+        <div class="announcement-text">{{ currentAnnouncement.content }}</div>
+      </div>
+      <div class="announcement-body" v-else>
+        <h3 style="color:#fff;margin-bottom:15px;">{{ t('announcement_default_title') }}</h3>
+        <div class="announcement-text">{{ t('announcement_default_content') }}</div>
+      </div>
+
+      <!-- 开源署名：AGPL-3.0 要求显著标注非官方来源 -->
+      <div class="announcement-attribution">
+        <strong>{{ t('attribution_title') }}</strong><br>
+        {{ t('attribution_body') }}<br>
+        <span style="opacity:.8">{{ t('attribution_license') }}</span>
+      </div>
+
+      <div class="announcement-footer">
+        <div class="countdown-timer" v-if="announcementCountdown > 0">
+          <span>{{ t('read_countdown', {seconds: announcementCountdown}) }}</span>
+        </div>
+        <button class="action-btn primary btn-read"
+                @click="markAnnouncementRead"
+                :disabled="announcementCountdown > 0"
+                :class="{ disabled: announcementCountdown > 0 }">
+          {{ announcementCountdown > 0 ? t('please_read') : t('i_have_read') }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 玩家上传模态框 ==================== -->
+  <div class="modal" v-if="showUploadModModal" @click.self="showUploadModModal = false">
+    <div class="modal-content" style="max-width:500px;">
+      <span class="close" @click="showUploadModModal = false">&times;</span>
+      <h2 style="color:var(--accent);">{{ t('upload_mod') }}</h2>
+      <div class="form-group">
+        <label>{{ t('mod_name') }} *</label>
+        <input type="text" v-model="userModForm.name" :placeholder="t('mod_name_ph')">
+      </div>
+      <div class="form-group">
+        <label>{{ t('author') }}</label>
+        <input type="text" v-model="userModForm.author" :placeholder="t('author_placeholder')">
+      </div>
+      <div class="form-group">
+        <label>{{ t('version') }}</label>
+        <input type="text" v-model="userModForm.version" placeholder="1.0">
+      </div>
+      <div class="form-group">
+        <label>{{ t('category') }}</label>
+        <input type="text" v-model="userModForm.category" placeholder="Gameplay / Items / Vehicle...">
+      </div>
+      <div class="form-group">
+        <label>{{ t('description') }}</label>
+        <textarea v-model="userModForm.description" rows="3" :placeholder="t('description_placeholder')"></textarea>
+      </div>
+      <div class="form-group">
+        <label>{{ t('mod_file') }}</label>
+        <input type="file" accept=".unity3d,.zip,.rar,.7z,.tar,.gz">
+        <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">{{ t('mod_file_or_link_hint') }}</div>
+      </div>
+      <div class="form-group">
+        <label>{{ t('download_link') }}</label>
+        <input type="text" v-model="userModForm.download_link" :placeholder="t('download_link_ph')">
+      </div>
+      <div class="form-group">
+        <label>{{ t('picture_url') }}</label>
+        <input type="text" v-model="userModForm.picture_url" :placeholder="t('picture_url_placeholder')">
+      </div>
+      <div class="modal-actions">
+        <button class="action-btn secondary" @click="showUploadModModal = false">{{ t('cancel') }}</button>
+        <button class="action-btn primary" @click="submitUserMod" :disabled="userModUploading">{{ userModUploading ? t('loading') : t('upload') }}</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 上传整合包模态框 ==================== -->
+  <div class="modal" v-if="showUploadModal" @click.self="showUploadModal = false">
+    <div class="modal-content" style="max-width:500px;">
+      <span class="close" @click="showUploadModal = false">&times;</span>
+      <h2 style="color:var(--accent);">{{ t('upload_modpack') }}</h2>
+      <div class="form-group">
+        <label>{{ t('modpack_name') }} *</label>
+        <input type="text" v-model="uploadForm.name" :placeholder="t('modpack_name_placeholder')">
+      </div>
+      <div class="form-group">
+        <label>{{ t('author') }} *</label>
+        <input type="text" v-model="uploadForm.author" :placeholder="t('author_placeholder')">
+      </div>
+      <div class="form-group">
+        <label>{{ t('description') }}</label>
+        <textarea v-model="uploadForm.description" :placeholder="t('description_placeholder')" rows="3"></textarea>
+      </div>
+      <div class="form-group">
+        <label>{{ t('picture_url') }}</label>
+        <input type="text" v-model="uploadForm.picture_url" :placeholder="t('picture_url_placeholder')">
+        <input type="file" accept="image/*" @change="handlePictureUpload" style="margin-top:5px;">
+      </div>
+      <div class="form-group">
+        <label>{{ t('video_url') }}</label>
+        <input type="text" v-model="uploadForm.video_url" :placeholder="t('video_url_placeholder')">
+        <input type="file" accept="video/*" @change="handleVideoUpload" style="margin-top:5px;">
+      </div>
+      <div class="form-group">
+        <label>{{ t('tutorial_url') }}</label>
+        <input type="text" v-model="uploadForm.tutorial_url" :placeholder="t('tutorial_url_placeholder')">
+      </div>
+      <div class="form-group">
+        <label>{{ t('modpack_file') }} * ({{ t('only_zip') }})</label>
+        <input type="file" ref="modpackFile" accept=".zip,.rar,.7z,.tar,.gz" @change="handleModpackFileSelect">
+      </div>
+      <div class="modal-actions">
+        <button class="action-btn primary" @click="doUploadModpack" :disabled="uploadLoading">{{ uploadLoading ? t('uploading') : t('upload') }}</button>
+        <button class="action-btn secondary" @click="showUploadModal = false">{{ t('cancel') }}</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 帖子详情/评论模态框 ==================== -->
+  <div class="modal" v-if="showCommentsModal" @click.self="showCommentsModal = false">
+    <div class="modal-content" style="max-width:600px;">
+      <span class="close" @click="showCommentsModal = false">&times;</span>
+      <h2 style="color:var(--accent);">{{ t('comments') }}</h2>
+      <div v-if="currentPost" class="post-detail">
+        <div class="post-header">
+          <span class="post-author">{{ currentPost.username }}</span>
+          <span class="post-date">{{ formatDate(currentPost.created_at) }}</span>
+        </div>
+        <div class="post-content">{{ currentPost.content }}</div>
+        <div class="post-media" v-if="currentPost.image_url || currentPost.video_url">
+          <img v-if="currentPost.image_url" :src="currentPost.image_url" alt="image" @error="imgFallback">
+          <a v-if="currentPost.video_url" :href="currentPost.video_url" target="_blank" class="video-link">🎬 {{ t('watch_video') }}</a>
+        </div>
+      </div>
+      <div class="comments-section">
+        <div v-if="postComments.length === 0" class="info">{{ t('no_comments') }}</div>
+        <div v-for="comment in postComments" :key="comment.id" class="comment-item">
+          <div class="comment-header">
+            <span class="comment-author">{{ comment.username }}</span>
+            <span class="comment-date">{{ formatDate(comment.created_at) }}</span>
+          </div>
+          <div class="comment-content">{{ comment.content }}</div>
+        </div>
+      </div>
+      <div class="form-group" style="margin-top:15px;">
+        <textarea v-model="newComment" :placeholder="t('comment_placeholder')" rows="2"></textarea>
+      </div>
+      <div class="modal-actions">
+        <button class="action-btn primary" @click="submitComment" :disabled="!newComment.trim()">{{ t('submit_comment') }}</button>
+        <button class="action-btn secondary" @click="showCommentsModal = false">{{ t('close') }}</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 创建帖子模态框 ==================== -->
+  <div class="modal" v-if="showPostModal" @click.self="showPostModal = false">
+    <div class="modal-content" style="max-width:500px;">
+      <span class="close" @click="showPostModal = false">&times;</span>
+      <h2 style="color:var(--accent);">{{ t('create_post') }}</h2>
+      <div class="form-group">
+        <label>{{ t('related_modpack') }}</label>
+        <select v-model="postForm.modpack_id">
+          <option value="">{{ t('no_modpack') }}</option>
+          <option v-for="pack in playerModpacks" :key="pack.id" :value="pack.id">{{ pack.name }}</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>{{ t('post_content') }} *</label>
+        <textarea v-model="postForm.content" :placeholder="t('post_content_placeholder')" rows="4"></textarea>
+      </div>
+      <div class="form-group">
+        <label>{{ t('image_url') }}</label>
+        <input type="text" v-model="postForm.image_url" :placeholder="t('image_url_placeholder')">
+        <input type="file" accept="image/*" @change="handlePostImageUpload" style="margin-top:5px;">
+      </div>
+      <div class="form-group">
+        <label>{{ t('video_url') }}</label>
+        <input type="text" v-model="postForm.video_url" :placeholder="t('video_url_placeholder')">
+        <input type="file" accept="video/*" @change="handlePostVideoUpload" style="margin-top:5px;">
+      </div>
+      <div class="modal-actions">
+        <button class="action-btn primary" @click="submitPost" :disabled="!postForm.content.trim() || postLoading">{{ postLoading ? t('posting') : t('submit_post') }}</button>
+        <button class="action-btn secondary" @click="showPostModal = false">{{ t('cancel') }}</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 批量操作栏 ==================== -->
+  <div class="batch-bar" :class="{ active: batchBarActive }">
+    <span>{{ t('selected_items', {count: batchCount}) }}</span>
+    <button v-if="activeTab === 'browse'" class="action-btn primary" :disabled="batchBusy" @click="batchInstall">{{ batchBusy ? t('batch_installing') : t('batch_install') }}</button>
+    <button class="action-btn danger" :disabled="batchBusy" @click="batchUninstall">{{ batchBusy ? t('batch_uninstalling') : t('batch_uninstall') }}</button>
+    <button v-if="activeTab === 'manage'" class="action-btn warning" :disabled="batchBusy" @click="batchUpdate">{{ batchBusy ? t('batch_updating') : t('batch_update') }}</button>
+    <button class="action-btn secondary" @click="clearCurrentSelection">{{ t('cancel') }}</button>
+  </div>
+
+  <!-- ==================== 下载管理器 ==================== -->
+  <div class="download-manager">
+    <div class="download-header" @click="dlExpanded = !dlExpanded">
+      <span>{{ t('download_tasks') }} ({{ activeTaskCount }})</span>
+      <span>{{ dlExpanded ? '▼' : '▲' }}</span>
+    </div>
+    <div class="task-list" v-show="dlExpanded">
+      <div v-if="downloadTasks.length === 0" style="color:#888;text-align:center;padding:10px;">{{ t('no_tasks') }}</div>
+      <div v-for="task in downloadTasks" :key="task.id" class="task-item">
+        <div style="display:flex;justify-content:space-between;">
+          <span>{{ task.name }}</span>
+          <span :style="{color: task.status==='completed'?'#4caf50':task.status==='failed'?'#f44336':'#ff9800'}">{{ task.status === 'downloading' ? (task.progress||0).toFixed(0) + '%' : task.status }}</span>
+        </div>
+        <div class="task-progress-bar" :style="{width: (task.progress||0) + '%'}"></div>
+      </div>
+    </div>
+  </div>
+
+  <button id="back-to-top" v-show="showBackToTop" @click="scrollToTop">↑</button>
+
+  <div class="toast-container">
+    <div v-for="toast in toasts" :key="toast.id" class="toast" :class="toast.type">{{ toast.message }}</div>
+  </div>
+
+  </template>
+</div>
+
+<script>
+function initVueApp() {
+  var FD = JSON.parse(document.getElementById('flask-data').textContent);
+
+  Vue.createApp({
+    data: function() {
+      return {
+        appReady: true,
+        version: FD.version,
+        translations: FD.translations || {},
+        activeTab: 'home',
+        sidebarCollapsed: false,
+        mobileMenuOpen: false,
+
+        // ===== 首页 =====
+        homeSection: 'mods',
+        homeSearchQuery: '',
+        homeSearchType: 'mods',
+        homeModScope: 'all',
+        homeCategory: '',
+        homeViewMode: 'grid',
+        homeSelected: [],
+        hasAnnouncement: false,
+        announcementBadge: '',
+
+        // 游戏情报：玩家可自定义发布
+        customIntel: [],
+        showIntelEditor: false,
+        intelForm: { title: '', content: '', link: '' },
+
+        // ===== 玩家上传模组 =====
+        userMods: [],
+        userModsLoading: false,
+        showUploadModModal: false,
+        userModUploading: false,
+        userModForm: { name: '', author: '', version: '1.0', category: '',
+                       description: '', download_link: '', picture_url: '' },
+
+        sources: [],
+        sourceIndex: 0,
+        modpackSourceIndex: 0,
+        manageSourceIndex: 0,
+        strictMode: false,
+
+        mods: [],
+        modpacks: [],
+        loading: false,
+        modpacksLoading: false,
+
+        searchQuery: '',
+        debouncedSearch: '',
+        selectedCategory: '',
+        viewMode: 'grid',
+        modpackViewMode: 'grid',
+        manageViewMode: 'list',
+
+        selectedBrowse: [],
+        selectedManage: [],
+        batchBusy: false,
+
+        showDetailModal: false,
+        detailMod: null,
+        detailDepInfo: [],
+        detailConflicts: [],
+        detailFetchAbort: null,
+        translatingDesc: false,
+        translatedDesc: '',
+        translatedName: '',
+
+        showResultModal: false,
+        resultLines: [],
+
+        installedConflicts: [],
+        conflictModNames: {},
+
+        downloadTasks: [],
+        dlExpanded: false,
+        taskTimer: null,
+
+        config: { exe_path: '', use_proxy: false, backup_name: 'ModpackManager_old.exe' },
+        themeBgColor: '#12121a',
+        steamStatus: null,
+        currentLang: 'auto',
+        checkingUpdate: false,
+        licenseText: '',
+        toasts: [],
+        toastId: 0,
+        showBackToTop: false,
+
+        // 用户相关
+        currentUser: null,
+        showLoginModal: false,
+        showRegisterModal: false,
+        loginForm: { username: '', password: '' },
+        registerForm: { username: '', password: '', confirmPassword: '' },
+        loginLoading: false,
+        registerLoading: false,
+
+        // 玩家整合包相关
+        playerModpacks: [],
+        playerModpacksLoading: false,
+        playerModpackViewMode: 'grid',
+        showUploadModal: false,
+        uploadForm: { name: '', author: '', description: '', picture_url: '', video_url: '', tutorial_url: '' },
+        uploadFile: null,
+        uploadPicture: null,
+        uploadVideo: null,
+        uploadLoading: false,
+
+        // 论坛相关
+        forumPosts: [],
+        forumLoading: false,
+        forumModpackFilter: '',
+        showPostModal: false,
+        postForm: { modpack_id: '', content: '', image_url: '', video_url: '' },
+        postLoading: false,
+        postImage: null,
+        postVideo: null,
+        showCommentsModal: false,
+        currentPost: null,
+        postComments: [],
+        newComment: '',
+
+        // 公告相关
+        showAnnouncementModal: false,
+        currentAnnouncement: null,
+        announcementCountdown: 10,
+        announcementTimer: null,
+
+        // AI推荐相关
+        aiSearchQuery: '',
+        aiRecommendations: [],
+        aiLoading: false,
+        aiError: '',
+        aiConfig: {
+          ai: {
+            name: 'AI模组推荐助手',
+            intro: '大家好！我是AI模组推荐助手，专为长途旅行(The Long Drive)游戏玩家设计。我可以根据您的需求推荐最适合的模组，帮助您提升游戏体验！',
+            features: ['智能推荐', '模组搜索', '热门排行', '一键下载']
+          }
+        },
+        aiQuickTags: ['细菌', '车辆', '地图', '食物', '武器', '牛奶', '优化', '生存'],
+        appBlockedByAnnouncement: false
+      };
+    },
+
+    computed: {
+      categories: function() { var s={}; this.mods.forEach(function(m){if(m.Category)s[m.Category]=1}); return Object.keys(s).sort(); },
+      filteredMods: function() {
+        var self=this, r=this.mods;
+        if(this.debouncedSearch){var q=this.debouncedSearch.toLowerCase();r=r.filter(function(m){return(m.Name&&m.Name.toLowerCase().indexOf(q)!==-1)||(m.Author&&m.Author.toLowerCase().indexOf(q)!==-1)||(m.Description&&m.Description.toLowerCase().indexOf(q)!==-1)})}
+        if(this.selectedCategory){r=r.filter(function(m){return m.Category===self.selectedCategory})}
+        return r;
+      },
+      installedMods: function() { return this.mods.filter(function(m){return m.is_installed}); },
+      batchBarActive: function() { if(this.activeTab==='browse')return this.selectedBrowse.length>0; if(this.activeTab==='manage')return this.selectedManage.length>0; return false; },
+      batchCount: function() { if(this.activeTab==='browse')return this.selectedBrowse.length; if(this.activeTab==='manage')return this.selectedManage.length; return 0; },
+      activeTaskCount: function() { return this.downloadTasks.filter(function(t){return t.status==='downloading'||t.status==='pending'}).length; },
+      // 当前数据源名称（游戏情报卡片用）
+      currentSourceName: function() {
+        var s = this.sources[this.sourceIndex];
+        if (!s) return '-';
+        return s.Title || s.title || s.name || ('Source ' + (this.sourceIndex + 1));
+      },
+      // 首页模组列表：整合了「浏览模组」+「已安装模组」
+      homeFilteredMods: function() {
+        var r = this.mods;
+        if (this.homeModScope === 'installed') {
+          r = r.filter(function(m) { return m.is_installed; });
+        }
+        var q = (this.homeSearchQuery || '').trim().toLowerCase();
+        if (q) {
+          r = r.filter(function(m) {
+            return (m.Name && m.Name.toLowerCase().indexOf(q) !== -1) ||
+              (m.Author && m.Author.toLowerCase().indexOf(q) !== -1) ||
+              (m.Description && m.Description.toLowerCase().indexOf(q) !== -1);
+          });
+        }
+        if (this.homeCategory) {
+          r = r.filter(function(m) { return m.Category === this.homeCategory; }.bind(this));
+        }
+        return r;
+      }
+    },
+
+    watch: {
+      searchQuery: function(val) {
+        var self = this;
+        clearTimeout(this._searchTimer);
+        this._searchTimer = setTimeout(function() { self.debouncedSearch = val; }, 300);
+      }
+    },
+
+    methods: {
+      t: function(key, args) {
+        var text = this.translations[key] || key;
+        if(args){Object.keys(args).forEach(function(k){text=text.replace('{'+k+'}',String(args[k]))})}
+        return text;
+      },
+
+      initLanguage: function() {
+        var saved=localStorage.getItem('tld_lang')||'auto'; this.currentLang=saved;
+        var lang=saved;
+        if(lang==='auto'){var nl=navigator.language||'';lang=nl.startsWith('zh')?'zh':nl.startsWith('fr')?'fr':nl.startsWith('ar')?'ar':nl.startsWith('es')?'es':nl.startsWith('ru')?'ru':'en'}
+        if(lang!=='zh'||Object.keys(this.translations).length===0){var self=this;fetch('/api/translations?lang='+lang).then(function(r){return r.json()}).then(function(d){self.translations=d}).catch(function(){})}
+      },
+      changeLanguage: function() { localStorage.setItem('tld_lang',this.currentLang); this.initLanguage(); },
+
+      // ===== 车间工具下载 =====
+      downloadWorkshopTool: function() {
+        var self = this;
+        self.showToast('正在下载车间工具...', 'info');
+        var link = document.createElement('a');
+        link.href = '/api/download-workshop-tool';
+        link.download = '长途车间汉化版.exe';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        self.showToast('车间工具下载已开始，请保存文件', 'success');
+      },
+
+      checkSteam: function() {
+        var self = this;
+        fetch('/api/check-steam')
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+            self.steamStatus = data;
+            if (data.installed) {
+              self.showToast('检测到Steam已安装', 'success');
+            } else {
+              self.showToast('未检测到Steam，请安装Steam后重试', 'warning');
+            }
+          })
+          .catch(function(err) {
+            self.showToast('检测Steam失败: ' + err, 'error');
+          });
+      },
+
+      loadSources: function() { var self=this; fetch('/api/sources').then(function(r){return r.json()}).then(function(d){self.sources=d}).catch(function(){}) },
+
+      loadMods: function() {
+        var self=this; this.loading=true;
+        var src=this.activeTab==='manage'?this.manageSourceIndex:this.sourceIndex;
+        fetch('/api/mods?source='+src+'&strict='+this.strictMode).then(function(r){return r.json()}).then(function(d){
+          self.mods=(d.mods||[]).map(function(m){return Object.assign({},m,{_busy:false})});
+          if(d.active_source!==undefined){if(self.activeTab==='manage')self.manageSourceIndex=d.active_source;else self.sourceIndex=d.active_source}
+          self.loadInstalledConflicts();
+        }).catch(function(){self.showToast(self.t('load_mods_failed'),'error')}).finally(function(){self.loading=false});
+      },
+
+      loadModpacks: function() {
+        var self=this; this.modpacksLoading=true;
+        fetch('/api/modpacks?source='+this.modpackSourceIndex).then(function(r){return r.json()}).then(function(d){self.modpacks=d.modpacks||[]}).catch(function(){}).finally(function(){self.modpacksLoading=false});
+      },
+
+      switchTab: function(tab) {
+        this.activeTab=tab; this.mobileMenuOpen=false;
+        if(tab==='home'){ return; }
+        if(tab==='browse'||tab==='manage'){this.loadMods()}
+        else if(tab==='modpacks'){this.loadModpacks()}
+        else if(tab==='player_modpacks'){this.loadPlayerModpacks()}
+        else if(tab==='forum'){this.loadForumPosts()}
+      },
+
+      // 侧边栏切到首页的某个功能分区
+      switchHomeSection: function(sec) {
+        this.activeTab = 'home';
+        this.mobileMenuOpen = false;
+        this.homeSection = sec;
+        if (sec === 'mods' || sec === 'installed') this.loadMods();
+        else if (sec === 'modpacks') this.loadModpacks();
+        else if (sec === 'player_modpacks') this.loadPlayerModpacks();
+        else if (sec === 'user_mods') this.loadUserMods();
+        else if (sec === 'forum') this.loadForumPosts();
+      },
+
+      // 右下角设置按钮
+      goSettings: function() {
+        this.activeTab = 'settings';
+        this.mobileMenuOpen = false;
+        // 滚动到顶部，避免停留在页面中部
+        var el = this.$refs.mainContent;
+        if (el) el.scrollTop = 0;
+        var self = this;
+        this.$nextTick(function() {
+          var box = document.querySelector(".tab-content.active");
+          if (box) { box.style.opacity = '1'; box.style.display = 'block'; }
+        });
+      },
+
+      // 从设置页一键返回首页（不用往上滑）
+      goBackFromSettings: function() {
+        this.activeTab = 'home';
+        this.homeSection = 'mods';
+        var el = this.$refs.mainContent;
+        if (el) el.scrollTop = 0;
+      },
+
+      // ===== 首页搜索 =====
+      doHomeSearch: function() {
+        var q = (this.homeSearchQuery || '').trim();
+        var type = this.homeSearchType;
+
+        // 已装/全部 → 直接在首页筛选已安装
+        if (type === 'installed' || type === 'all' || type === 'mods') {
+          this.homeModScope = (type === 'installed') ? 'installed' : 'all';
+        }
+
+        // 整合包 → 跳到整合包页
+        if (type === 'modpacks') {
+          if (!q) {
+            this.showToast(this.t('home_search_empty'), 'info');
+            return;
+          }
+          this.switchTab('modpacks');
+          this.showToast(this.t('home_search_modpacks_hint'), 'info');
+        }
+      },
+
+      // ===== 玩家上传模组 =====
+      loadUserMods: function() {
+        var self = this;
+        this.userModsLoading = true;
+        fetch('/api/user-mods')
+          .then(function(r) { return r.json(); })
+          .then(function(d) {
+            self.userMods = (d && d.mods) || [];
+          })
+          .catch(function() { self.userMods = []; })
+          .finally(function() { self.userModsLoading = false; });
+      },
+      submitUserMod: function() {
+        var self = this;
+        if (!this.currentUser) {
+          this.showToast(this.t('login_required'), 'info');
+          return;
+        }
+        var f = this.userModForm;
+        if (!f.name || !f.name.trim()) {
+          this.showToast(this.t('mod_name_required'), 'info');
+          return;
+        }
+        var input = document.querySelector('.modal input[type="file"]');
+        var file = input && input.files[0];
+        if (!file && !f.download_link.trim()) {
+          this.showToast(this.t('mod_file_or_link_hint'), 'info');
+          return;
+        }
+        var fd = new FormData();
+        fd.append('user_id', this.currentUser.id);
+        fd.append('name', f.name.trim());
+        fd.append('author', f.author.trim());
+        fd.append('version', f.version.trim() || '1.0');
+        fd.append('category', f.category.trim() || 'Other');
+        fd.append('description', f.description.trim());
+        fd.append('download_link', f.download_link.trim());
+        fd.append('picture_url', f.picture_url.trim());
+        if (file) fd.append('file', file);
+
+        this.userModUploading = true;
+        fetch('/api/upload-mod', { method: 'POST', body: fd })
+          .then(function(r) { return r.json(); })
+          .then(function(d) {
+            if (d.success) {
+              self.showToast(self.t('upload_success'), 'success');
+              self.userModForm = { name: '', author: '', version: '1.0', category: '',
+                                   description: '', download_link: '', picture_url: '' };
+              var m = document.querySelector('.modal input[type="file"]');
+              if (m) m.value = '';
+              self.showUploadModModal = false;
+              self.loadUserMods();
+            } else {
+              self.showToast(d.error || self.t('upload_failed'), 'error');
+            }
+          })
+          .catch(function() { self.showToast(self.t('upload_failed'), 'error'); })
+          .finally(function() { self.userModUploading = false; });
+      },
+
+      // ===== 游戏情报自定义 =====
+      addIntel: function() {
+        var f = this.intelForm;
+        if (!f.title || !f.title.trim()) {
+          this.showToast(this.t('intel_title_required'), 'info');
+          return;
+        }
+        this.customIntel.unshift({
+          title: f.title.trim(),
+          content: (f.content || '').trim(),
+          link: (f.link || '').trim()
+        });
+        // 持久化到本地，刷新不丢
+        try { localStorage.setItem('tld_custom_intel', JSON.stringify(this.customIntel)); } catch(e) {}
+        this.intelForm = { title: '', content: '', link: '' };
+        this.showIntelEditor = false;
+        this.showToast(this.t('intel_added'), 'success');
+      },
+      removeIntel: function(idx) {
+        this.customIntel.splice(idx, 1);
+        try { localStorage.setItem('tld_custom_intel', JSON.stringify(this.customIntel)); } catch(e) {}
+      },
+
+      // ===== 首页批量选择 =====
+      selectAllHome: function() {
+        this.homeSelected = this.homeFilteredMods.map(function(m) { return m.FileName; });
+      },
+      invertSelectionHome: function() {
+        var self = this;
+        var cur = this.homeSelected;
+        this.homeSelected = this.homeFilteredMods.map(function(m) { return m.FileName; })
+          .filter(function(f) { return cur.indexOf(f) === -1; });
+      },
+
+      // ===== 公告 =====
+      openAnnouncement: function() {
+        // 手动打开：拉取最新公告，取不到就用默认公告
+        var self = this;
+        this.showAnnouncementModal = true;
+        this.startAnnouncementCountdown(5);
+        fetch('/api/announcements')
+          .then(function(r) { return r.json(); })
+          .then(function(d) {
+            var list = (d && (d.announcements || d.data)) || [];
+            if (list && list.length) self.currentAnnouncement = list[0];
+          })
+          .catch(function(){});
+      },
+
+      imgFallback: function(e) { e.target.src='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="70">📦</text></svg>'); },
+
+      // ===== 冲突检测 =====
+      loadInstalledConflicts: function() {
+        var self=this;
+        fetch('/api/check-conflicts').then(function(r){return r.json()}).then(function(d){
+          self.installedConflicts=d.conflicts||[];
+          self.conflictModNames={};
+          (d.conflicts||[]).forEach(function(c){c.mods.forEach(function(m){self.conflictModNames[m.toLowerCase()]=true})});
+        }).catch(function(){});
+      },
+      hasConflict: function(name) { return name && this.conflictModNames[name.toLowerCase()]; },
+
+      // ===== 详情（#1 用正确数据源，#2 AbortController） =====
+      // ===== 自动翻译：打开详情时把名/简介翻成中文 =====
+      autoTranslateDetail: function(mod) {
+        if (!mod) return;
+        var self = this;
+        var name = (mod.Name || '').trim();
+        var desc = (mod.Description || '').trim();
+
+        // 已经是中文就不翻了，省一次请求
+        function hasChinese(s) {
+          return /[\u4e00-\u9fa5]/.test(s);
+        }
+
+        // 带一次重试：公共翻译接口偶发失败，重试一次大多能成功
+        function request(text, onDone) {
+          var tried = 0;
+          function attempt() {
+            fetch('/api/translate', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ text: text, target: 'zh' })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+              var out = (d && d.success && d.translated) ? d.translated : '';
+              if (hasChinese(out) && out !== text) {
+                onDone(out);
+              } else if (++tried < 2) {
+                attempt();
+              }
+              // 重试仍失败 → 静默放弃，保留原文
+            })
+            .catch(function() {
+              if (++tried < 2) attempt();
+            });
+          }
+          attempt();
+        }
+
+        if (name && !hasChinese(name)) {
+          var selfName = name;
+          request(name, function(t) { self.translatedName = t; });
+        }
+        if (desc && !hasChinese(desc)) {
+          var shortDesc = desc.length > 400 ? desc.slice(0, 400) : desc;
+          request(shortDesc, function(t) { self.translatedDesc = t; });
+        }
+      },
+
+      openDetail: function(mod) {
+        var self = this;
+        if (this.detailFetchAbort) {
+          try { this.detailFetchAbort.abort(); } catch(e) {}
+        }
+        this.detailFetchAbort = new AbortController();
+        var signal = this.detailFetchAbort.signal;
+
+        this.detailMod = mod;
+        this.detailDepInfo = [];
+        this.detailConflicts = [];
+        this.translatedName = '';
+        this.translatedDesc = '';
+        this.showDetailModal = true;
+
+        // 自动翻译：打开详情即把英文名/简介翻成中文（失败静默，保留原文）
+        this.autoTranslateDetail(mod);
+
+        var src = this.activeTab === 'manage' ? this.manageSourceIndex : this.sourceIndex;
+
+        if (mod.FileName) {
+          fetch('/api/resolve-deps', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({filename: mod.FileName, source: src}),
+            signal: signal
+          })
+          .then(function(r) { return r.json(); })
+          .then(function(d) { self.detailDepInfo = d.dependencies || []; })
+          .catch(function(e) { if (e.name !== 'AbortError') {} });
+        }
+        if (mod.Name) {
+          fetch('/api/check-new-conflicts', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({name: mod.Name}),
+            signal: signal
+          })
+          .then(function(r) { return r.json(); })
+          .then(function(d) { self.detailConflicts = d.conflicts || []; })
+          .catch(function(e) { if (e.name !== 'AbortError') {} });
+        }
+      },
+
+      // ===== 翻译模组介绍 =====
+      translateModDesc: function(mod) {
+        var self = this;
+        var text = mod.Description || mod.Changelog || '';
+        if (!text || text.trim() === '') {
+          this.showToast(this.t('no_text_to_translate'), 'error');
+          return;
+        }
+        this.translatingDesc = true;
+        fetch('/api/translate', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({text: text, target: 'zh'})
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d.success && d.translated) {
+            self.translatedDesc = d.translated;
+            self.showToast(self.t('translate_success'), 'success');
+          } else {
+            self.showToast(d.error || self.t('translate_failed'), 'error');
+          }
+        })
+        .catch(function() { self.showToast(self.t('translate_failed'), 'error'); })
+        .finally(function() { self.translatingDesc = false; });
+      },
+
+      // ===== 下载（直接在浏览器中下载）=====
+      doDownload: function(mod) {
+        var self=this; mod._busy=true;
+        var link = document.createElement('a');
+        link.href = mod.Link;
+        link.download = mod.FileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        self.showToast(self.t('download_start')+': '+mod.Name,'success');
+        mod._busy=false;
+        mod.is_installed=true;
+        mod.installed_version=mod.Version;
+      },
+
+      // ===== 安装 =====
+      doInstall: function(mod) {
+        var self=this; mod._busy=true;
+        fetch('/api/install',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filename:mod.FileName,source:this.sourceIndex,auto_deps:true})})
+        .then(function(r){return r.json()}).then(function(d){
+          if(d.success){
+            var msg=self.t('toast_install_success')+': '+(d.name||mod.Name);
+            if(d.dep_results&&d.dep_results.length>0) msg+='\n'+d.dep_results.join('\n');
+            self.showToast(msg,'success');
+            mod.is_installed=true; mod.installed_version=d.new_version;
+            self.loadInstalledConflicts();
+          } else { self.showToast(d.error||self.t('install_request_failed'),'error') }
+        }).catch(function(){self.showToast(self.t('install_request_failed'),'error')}).finally(function(){mod._busy=false});
+      },
+
+      doUninstall: function(mod) {
+        var name=mod.Name||mod.FileName;
+        if(!confirm(this.t('confirm_uninstall',{name:name})))return;
+        var self=this;
+        fetch('/api/uninstall',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name})})
+        .then(function(r){return r.json()}).then(function(d){
+          if(d.success){self.showToast(self.t('uninstall_success')+': '+name,'success');mod.is_installed=false;mod.installed_version='';self.loadInstalledConflicts()}
+          else{self.showToast(d.error||self.t('uninstall_failed'),'error')}
+        }).catch(function(){self.showToast(self.t('uninstall_request_failed'),'error')});
+      },
+
+      doUninstallByName: function(name) {
+        if(!confirm(this.t('confirm_uninstall',{name:name})))return;
+        var self=this;
+        fetch('/api/uninstall',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name})})
+        .then(function(r){return r.json()}).then(function(d){
+          if(d.success){self.showToast(self.t('uninstall_success')+': '+name,'success');self.loadMods()}
+          else{self.showToast(d.error||self.t('uninstall_failed'),'error')}
+        }).catch(function(){self.showToast(self.t('uninstall_request_failed'),'error')});
+      },
+
+      doUpdateByName: function(name) {
+        var self=this;
+        fetch('/api/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,source:self.manageSourceIndex})})
+        .then(function(r){return r.json()}).then(function(d){
+          if(d.success){self.showToast(self.t('update_success')+': '+name,'success');self.loadMods()}
+          else{self.showToast(d.error||self.t('update_failed'),'error')}
+        }).catch(function(){self.showToast(self.t('update_request_failed'),'error')});
+      },
+
+      doDownloadModpack: function(pack) {
+        var self=this;
+        var link = document.createElement('a');
+        link.href = pack.Link;
+        link.download = pack.Name + '.txt';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        self.showToast(self.t('download_start')+': '+pack.Name,'success');
+      },
+
+      doInstallModpack: function(pack) {
+        var self=this;
+        if(!confirm(this.t('confirm_install_modpack',{name:pack.Name})))return;
+        fetch('/api/install-modpack',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({Link:pack.Link,source:this.modpackSourceIndex})})
+        .then(function(r){return r.json()}).then(function(d){
+          if(d.results){self.resultLines=d.results;self.showResultModal=true}
+          else if(d.error){self.showToast(d.error,'error')}
+        }).catch(function(){self.showToast(self.t('install_modpack_failed'),'error')});
+      },
+
+      // ===== 多选 =====
+      selectAll: function(tab) {
+        if(tab==='browse')this.selectedBrowse=this.filteredMods.map(function(m){return m.FileName});
+        else if(tab==='manage')this.selectedManage=this.installedMods.map(function(m){return m.Name||m.FileName});
+      },
+      invertSelection: function(tab) {
+        if(tab==='browse'){var all=this.filteredMods.map(function(m){return m.FileName});var sel=this.selectedBrowse;this.selectedBrowse=all.filter(function(f){return sel.indexOf(f)===-1})}
+        else if(tab==='manage'){var all2=this.installedMods.map(function(m){return m.Name||m.FileName});var sel2=this.selectedManage;this.selectedManage=all2.filter(function(n){return sel2.indexOf(n)===-1})}
+      },
+      clearSelection: function(tab) { if(tab==='browse')this.selectedBrowse=[]; else if(tab==='manage')this.selectedManage=[]; else if(tab==='home')this.homeSelected=[]; },
+      clearCurrentSelection: function() { this.clearSelection(this.activeTab); },
+
+      // ===== 批量（#3 过滤无效Name，#8 loading状态） =====
+      batchInstall: function() {
+        var self=this;
+        if(this.batchBusy) return;
+        var pick=this.activeTab==='home'?this.homeSelected:this.selectedBrowse;
+        if(pick.length===0) return;
+        if(!confirm(this.t('confirm_batch_install',{count:pick.length})))return;
+        this.batchBusy=true;
+        fetch('/api/batch-install',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filenames:pick,source:this.sourceIndex})})
+        .then(function(r){return r.json()}).then(function(d){if(d.results){self.resultLines=d.results;self.showResultModal=true}self.selectedBrowse=[];self.homeSelected=[];self.loadMods()}).catch(function(){self.showToast(self.t('batch_install_failed'),'error')}).finally(function(){self.batchBusy=false});
+      },
+      batchUninstall: function() {
+        var self=this;
+        if(this.batchBusy) return;
+        var pick=this.activeTab==='home'?this.homeSelected:(this.activeTab==='browse'?this.selectedBrowse:this.selectedManage);
+        var names=pick.reduce(function(arr,fn){
+          var mod=self.mods.find(function(m){return m.FileName===fn});
+          if(mod&&mod.Name) arr.push(mod.Name);
+          return arr;
+        },[]);
+        if(names.length===0) return;
+        if(!confirm(this.t('confirm_batch_uninstall',{count:names.length})))return;
+        this.batchBusy=true;
+        fetch('/api/batch-uninstall',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({names:names})})
+        .then(function(r){return r.json()}).then(function(d){if(d.results){self.resultLines=d.results;self.showResultModal=true}self.clearCurrentSelection();self.homeSelected=[];self.loadMods()}).catch(function(){self.showToast(self.t('batch_uninstall_failed'),'error')}).finally(function(){self.batchBusy=false});
+      },
+      batchUpdate: function() {
+        var self=this;
+        if(this.batchBusy) return;
+        var pick=this.activeTab==='home'?this.homeSelected:this.selectedManage;
+        var names=pick.reduce(function(arr,fn){
+          var mod=self.mods.find(function(m){return m.FileName===fn});
+          if(mod&&mod.Name) arr.push(mod.Name);
+          return arr;
+        },[]);
+        if(names.length===0) return;
+        if(!confirm(this.t('confirm_batch_update',{count:names.length})))return;
+        this.batchBusy=true;
+        fetch('/api/batch-update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({names:names,source:this.sourceIndex})})
+        .then(function(r){return r.json()}).then(function(d){if(d.results){self.resultLines=d.results;self.showResultModal=true}self.selectedManage=[];self.homeSelected=[];self.loadMods()}).catch(function(){self.showToast(self.t('batch_update_failed'),'error')}).finally(function(){self.batchBusy=false});
+      },
+
+      // ===== 模组包 =====
+      exportModpack: function() {
+        var self=this;
+        fetch('/api/export-modpack').then(function(r){
+          if(r.ok)return r.blob().then(function(b){var u=URL.createObjectURL(b);var a=document.createElement('a');a.href=u;a.download='my_modpack.txt';a.click();URL.revokeObjectURL(u);self.showToast(self.t('export_success'),'success')});
+          else return r.json().then(function(d){self.showToast(d.error||self.t('export_failed'),'error')});
+        }).catch(function(){self.showToast(self.t('export_failed'),'error')});
+      },
+      importModpack: function(event) {
+        var self=this; var file=event.target.files[0]; if(!file)return;
+        var fd=new FormData(); fd.append('file',file); fd.append('source',this.modpackSourceIndex);
+        fetch('/api/import-modpack',{method:'POST',body:fd}).then(function(r){return r.json()}).then(function(d){if(d.results){self.resultLines=d.results;self.showResultModal=true}else if(d.error){self.showToast(d.error,'error')}}).catch(function(){self.showToast(self.t('import_failed'),'error')});
+        event.target.value='';
+      },
+
+      // ===== 侧边栏 =====
+      launchSteam: function() { window.open('steam://rungameid/1017180'); this.showToast(this.t('toast_launch_success'),'success'); },
+      launchExe: function() {
+        var self=this; if(!this.config.exe_path){this.showToast(this.t('error_no_exe_path'),'error');return}
+        fetch('/api/launch-exe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:this.config.exe_path})})
+        .then(function(r){return r.json()}).then(function(d){if(d.success)self.showToast(self.t('toast_launch_success'),'success');else self.showToast(d.error||self.t('launch_failed'),'error')}).catch(function(){self.showToast(self.t('launch_failed'),'error')});
+      },
+      installPatcher: function() {
+        var self=this;
+        fetch('/api/install-patcher',{method:'POST'}).then(function(r){return r.json()}).then(function(d){if(d.success)self.showToast(self.t('toast_patcher_launched'),'success');else self.showToast(d.error||self.t('launch_failed'),'error')}).catch(function(){self.showToast(self.t('launch_failed'),'error')});
+      },
+      cheat1000km: function() { window.open('https://github.com/Gsjsjzhznsz/htmlTheLongDrivemodsChinesepatch/raw/main/1000km.reg','_blank'); },
+
+      // ===== 设置 =====
+      loadConfig: function() {
+        var self=this;
+        fetch('/api/config').then(function(r){return r.json()}).then(function(d){if(d)Object.keys(d).forEach(function(k){if(d[k]!==null&&d[k]!==undefined)self.config[k]=d[k]})}).catch(function(){});
+        var bg=localStorage.getItem('tld_bg_color'); if(bg){this.themeBgColor=bg;document.documentElement.style.setProperty('--bg-color',bg)}
+      },
+      saveConfig: function() {
+        var self=this;
+        fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(this.config)}).then(function(){self.showToast(self.t('toast_settings_saved'),'success')}).catch(function(){self.showToast(self.t('save_failed'),'error')});
+      },
+      browseExe: function() {
+        var self=this;
+        fetch('/api/browse-exe',{method:'POST'}).then(function(r){return r.json()}).then(function(d){if(d.success){self.config.exe_path=d.path;self.showToast(self.t('toast_select_path'),'success')}else self.showToast(d.error||self.t('no_file_selected'),'warning')}).catch(function(){self.showToast(self.t('browse_failed'),'error')});
+      },
+      browseModsFolder: function() {
+        var self=this;
+        fetch('/api/browse-folder',{method:'POST'}).then(function(r){return r.json()}).then(function(d){if(d.success){self.config.mods_path=d.path;self.showToast(self.t('toast_select_path'),'success')}else self.showToast(d.error||self.t('no_file_selected'),'warning')}).catch(function(){self.showToast(self.t('browse_failed'),'error')});
+      },
+      applyTheme: function() { document.documentElement.style.setProperty('--bg-color',this.themeBgColor); localStorage.setItem('tld_bg_color',this.themeBgColor); this.showToast(this.t('toast_theme_applied'),'success'); },
+      resetTheme: function() { this.themeBgColor='#12121a'; document.documentElement.style.setProperty('--bg-color','#12121a'); localStorage.removeItem('tld_bg_color'); },
+
+      checkUpdate: function(isManual) {
+        var self=this; this.checkingUpdate=true;
+        fetch('/api/check-update').then(function(r){return r.json()}).then(function(d){if(d.update_available){if(confirm(self.t('update_found',{ver:d.latest})))self.performUpdate(d.download_url)}else if(isManual)alert(self.t('update_latest'))}).catch(function(){if(isManual)self.showToast(self.t('check_update_failed'),'error')}).finally(function(){self.checkingUpdate=false});
+      },
+      performUpdate: function(url) {
+        var self=this;
+        fetch('/api/do-update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:url,backup_name:this.config.backup_name||'ModpackManager_old.exe'})})
+        .then(function(r){return r.json()}).then(function(d){if(d.success)alert(self.t('update_close_hint'));else self.showToast(d.error||self.t('update_failed'),'error')}).catch(function(){self.showToast(self.t('update_failed'),'error')});
+      },
+
+      // ===== 下载任务 =====
+      pollTasks: function() { var self=this; fetch('/api/tasks').then(function(r){return r.json()}).then(function(d){self.downloadTasks=d}).catch(function(){}) },
+      startPolling: function() { var self=this; this.taskTimer=setInterval(function(){self.pollTasks()},2000) },
+      stopPolling: function() { if(this.taskTimer){clearInterval(this.taskTimer);this.taskTimer=null} },
+
+      loadLicense: function() { var self=this; fetch('/api/license').then(function(r){return r.text()}).then(function(t){self.licenseText=t}).catch(function(){}) },
+
+      // #10 Toast 去重
+      showToast: function(message, type) {
+        if (this.toasts.some(function(t) { return t.message === message && t.type === (type || 'success'); })) return;
+        var self=this; var id=++this.toastId;
+        this.toasts.push({id:id,message:message,type:type||'success'});
+        setTimeout(function(){self.toasts=self.toasts.filter(function(t){return t.id!==id})},3500);
+      },
+
+      handleScroll: function() { this.showBackToTop=this.$refs.mainContent&&this.$refs.mainContent.scrollTop>300 },
+      scrollToTop: function() { if(this.$refs.mainContent)this.$refs.mainContent.scrollTo({top:0,behavior:'smooth'}) },
+
+      // ===== 用户认证 =====
+      doLogin: function() {
+        var self=this;
+        if(!this.loginForm.username || !this.loginForm.password) {
+          this.showToast(this.t('error_empty_fields'),'error');
+          return;
+        }
+        this.loginLoading=true;
+        fetch('/api/login',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify(this.loginForm)
+        }).then(function(r){return r.json()}).then(function(d){
+          if(d.success){
+            self.currentUser={id:d.user_id,username:d.username};
+            localStorage.setItem('tld_user',JSON.stringify(self.currentUser));
+            self.showLoginModal=false;
+            self.loginForm={username:'',password:''};
+            self.showToast(self.t('login_success'),'success');
+            self.checkUnreadAnnouncement();
+          } else {
+            self.showToast(d.error||self.t('login_failed'),'error');
+          }
+        }).catch(function(){self.showToast(self.t('login_failed'),'error')}).finally(function(){self.loginLoading=false});
+      },
+      doRegister: function() {
+        var self=this;
+        if(!this.registerForm.username || !this.registerForm.password) {
+          this.showToast(this.t('error_empty_fields'),'error');
+          return;
+        }
+        if(this.registerForm.password !== this.registerForm.confirmPassword) {
+          this.showToast(this.t('password_mismatch'),'error');
+          return;
+        }
+        this.registerLoading=true;
+        fetch('/api/register',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({username:this.registerForm.username,password:this.registerForm.password})
+        }).then(function(r){return r.json()}).then(function(d){
+          if(d.success){
+            // 注册成功后自动登录
+            self.currentUser={id:d.user_id,username:d.username};
+            localStorage.setItem('tld_user',JSON.stringify(self.currentUser));
+            self.showRegisterModal=false;
+            self.registerForm={username:'',password:'',confirmPassword:''};
+            self.showToast(d.message||self.t('register_success'),'success');
+            self.checkUnreadAnnouncement();
+          } else {
+            self.showToast(d.error||self.t('register_failed'),'error');
+          }
+        }).catch(function(){self.showToast(self.t('register_failed'),'error')}).finally(function(){self.registerLoading=false});
+      },
+      logout: function() {
+        this.currentUser=null;
+        localStorage.removeItem('tld_user');
+        this.showToast(this.t('logout_success'),'success');
+      },
+      loadUserFromStorage: function() {
+        var user=localStorage.getItem('tld_user');
+        if(user){
+          try{this.currentUser=JSON.parse(user)}catch(e){}
+        }
+      },
+
+      // ===== 玩家整合包 =====
+      loadPlayerModpacks: function() {
+        var self=this;
+        this.playerModpacksLoading=true;
+        fetch('/api/modpacks-list').then(function(r){return r.json()}).then(function(d){
+          self.playerModpacks=d.modpacks||[];
+        }).catch(function(){}).finally(function(){self.playerModpacksLoading=false});
+      },
+      downloadPlayerModpack: function(pack) {
+        window.location.href='/api/download-modpack/'+pack.id;
+        this.showToast(this.t('download_start')+': '+pack.name,'success');
+      },
+      handleModpackFileSelect: function(e) {
+        this.uploadFile=e.target.files[0];
+      },
+      handlePictureUpload: function(e) {
+        this.uploadPicture=e.target.files[0];
+        if(this.uploadPicture){
+          this.uploadForm.picture_url=''; // 清除URL，使用上传文件
+        }
+      },
+      handleVideoUpload: function(e) {
+        this.uploadVideo=e.target.files[0];
+        if(this.uploadVideo){
+          this.uploadForm.video_url=''; // 清除URL，使用上传文件
+        }
+      },
+      doUploadModpack: function() {
+        var self=this;
+        if(!this.currentUser){
+          this.showToast(this.t('please_login_first'),'error');
+          return;
+        }
+        if(!this.uploadForm.name || !this.uploadForm.author){
+          this.showToast(this.t('error_name_author_required'),'error');
+          return;
+        }
+        if(!this.uploadFile){
+          this.showToast(this.t('error_file_required'),'error');
+          return;
+        }
+        this.uploadLoading=true;
+        var fd=new FormData();
+        fd.append('user_id',this.currentUser.id);
+        fd.append('name',this.uploadForm.name);
+        fd.append('author',this.uploadForm.author);
+        fd.append('description',this.uploadForm.description);
+        fd.append('picture_url',this.uploadForm.picture_url);
+        fd.append('video_url',this.uploadForm.video_url);
+        fd.append('tutorial_url',this.uploadForm.tutorial_url);
+        fd.append('file',this.uploadFile);
+        // 添加图片文件
+        if(this.uploadPicture){
+          fd.append('picture',this.uploadPicture);
+        }
+        // 添加视频文件
+        if(this.uploadVideo){
+          fd.append('video',this.uploadVideo);
+        }
+        fetch('/api/upload-modpack',{method:'POST',body:fd}).then(function(r){return r.json()}).then(function(d){
+          if(d.success){
+            self.showUploadModal=false;
+            self.uploadForm={name:'',author:'',description:'',picture_url:'',video_url:'',tutorial_url:''};
+            self.uploadFile=null;
+            self.uploadPicture=null;
+            self.uploadVideo=null;
+            self.$refs.modpackFile.value='';
+            self.showToast(self.t('upload_success'),'success');
+            self.loadPlayerModpacks();
+          } else {
+            self.showToast(d.error||self.t('upload_failed'),'error');
+          }
+        }).catch(function(){self.showToast(self.t('upload_failed'),'error')}).finally(function(){self.uploadLoading=false});
+      },
+
+      // ===== 论坛 =====
+      loadForumPosts: function() {
+        var self=this;
+        this.forumLoading=true;
+        var url='/api/forum-posts';
+        if(this.forumModpackFilter){
+          url+='?modpack_id='+this.forumModpackFilter;
+        }
+        fetch(url).then(function(r){return r.json()}).then(function(d){
+          self.forumPosts=d.posts||[];
+        }).catch(function(){}).finally(function(){self.forumLoading=false});
+      },
+      handlePostImageUpload: function(e) {
+        this.postImage=e.target.files[0];
+        if(this.postImage){
+          this.postForm.image_url=''; // 清除URL，使用上传文件
+        }
+      },
+      handlePostVideoUpload: function(e) {
+        this.postVideo=e.target.files[0];
+        if(this.postVideo){
+          this.postForm.video_url=''; // 清除URL，使用上传文件
+        }
+      },
+      submitPost: function() {
+        var self=this;
+        if(!this.currentUser){
+          this.showToast(this.t('please_login_first'),'error');
+          return;
+        }
+        if(!this.postForm.content.trim()){
+          this.showToast(this.t('error_content_required'),'error');
+          return;
+        }
+        this.postLoading=true;
+        var fd=new FormData();
+        fd.append('user_id',this.currentUser.id);
+        fd.append('modpack_id',this.postForm.modpack_id||'');
+        fd.append('content',this.postForm.content);
+        fd.append('image_url',this.postForm.image_url);
+        fd.append('video_url',this.postForm.video_url);
+        // 添加图片文件
+        if(this.postImage){
+          fd.append('image',this.postImage);
+        }
+        // 添加视频文件
+        if(this.postVideo){
+          fd.append('video',this.postVideo);
+        }
+        fetch('/api/create-post',{method:'POST',body:fd}).then(function(r){return r.json()}).then(function(d){
+          if(d.success){
+            self.showPostModal=false;
+            self.postForm={modpack_id:'',content:'',image_url:'',video_url:''};
+            self.postImage=null;
+            self.postVideo=null;
+            self.loadForumPosts();
+            self.showToast(self.t('post_success'),'success');
+          } else {
+            self.showToast(d.error||self.t('post_failed'),'error');
+          }
+        }).catch(function(){self.showToast(self.t('post_failed'),'error')}).finally(function(){self.postLoading=false});
+      },
+      likePost: function(post) {
+        var self=this;
+        if(!this.currentUser){
+          this.showToast(this.t('please_login_first'),'error');
+          return;
+        }
+        fetch('/api/like-post/'+post.id,{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({user_id:this.currentUser.id})
+        }).then(function(r){return r.json()}).then(function(d){
+          if(d.success){
+            post.likes_count++;
+            self.showToast(self.t('like_success'),'success');
+          } else {
+            self.showToast(d.error||self.t('like_failed'),'error');
+          }
+        }).catch(function(){self.showToast(self.t('like_failed'),'error')});
+      },
+      openComments: function(post) {
+        this.currentPost=post;
+        this.postComments=[];
+        this.newComment='';
+        this.showCommentsModal=true;
+        this.loadComments(post.id);
+      },
+      loadComments: function(postId) {
+        var self=this;
+        fetch('/api/posts/'+postId+'/comments').then(function(r){return r.json()}).then(function(d){
+          self.postComments=d.comments||[];
+        }).catch(function(){});
+      },
+      submitComment: function() {
+        var self=this;
+        if(!this.currentUser){
+          this.showToast(this.t('please_login_first'),'error');
+          return;
+        }
+        if(!this.newComment.trim()){
+          return;
+        }
+        fetch('/api/create-comment',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({
+            user_id:this.currentUser.id,
+            post_id:this.currentPost.id,
+            content:this.newComment
+          })
+        }).then(function(r){return r.json()}).then(function(d){
+          if(d.success){
+            self.newComment='';
+            self.loadComments(self.currentPost.id);
+            self.currentPost.comment_count++;
+            self.showToast(self.t('comment_success'),'success');
+          } else {
+            self.showToast(d.error||self.t('comment_failed'),'error');
+          }
+        }).catch(function(){self.showToast(self.t('comment_failed'),'error')});
+      },
+      formatDate: function(dateStr) {
+        if(!dateStr) return '';
+        var d=new Date(dateStr);
+        return d.toLocaleString();
+      },
+
+      // ===== 公告系统 =====
+      checkUnreadAnnouncement: function() {
+        var self = this;
+        if (!this.currentUser) return;
+        
+        fetch('/api/announcement/unread?user_id=' + this.currentUser.id)
+          .then(function(r) { return r.json(); })
+          .then(function(d) {
+            if (d.success && d.has_unread) {
+              self.currentAnnouncement = d.announcement;
+              self.showAnnouncementModal = true;
+              self.appBlockedByAnnouncement = true;
+              self.startAnnouncementCountdown();
+            }
+          })
+          .catch(function(e) { console.log('检查公告失败:', e); });
+      },
+
+      startAnnouncementCountdown: function(seconds) {
+        var self = this;
+        this.announcementCountdown = (typeof seconds === 'number' && seconds > 0) ? seconds : 10;
+        
+        if (this.announcementTimer) {
+          clearInterval(this.announcementTimer);
+        }
+        
+        this.announcementTimer = setInterval(function() {
+          self.announcementCountdown--;
+          if (self.announcementCountdown <= 0) {
+            clearInterval(self.announcementTimer);
+            self.announcementTimer = null;
+          }
+        }, 1000);
+      },
+
+      markAnnouncementRead: function() {
+        var self = this;
+
+        // 倒计时未结束时不响应
+        if (this.announcementCountdown > 0) return;
+
+        // 先关闭弹窗（无论后端是否成功），避免 default公告 / 未登录场景下弹窗关不掉
+        this.showAnnouncementModal = false;
+        this.appBlockedByAnnouncement = false;
+        this.currentAnnouncement = null;
+        if (this.announcementTimer) {
+          clearInterval(this.announcementTimer);
+          this.announcementTimer = null;
+        }
+
+        // 默认公告（无 id）或未登录时，无需再请求后端标记已读
+        var ann = this.currentAnnouncement;
+        var uid = this.currentUser ? this.currentUser.id : null;
+        if (!ann || !ann.id || !uid) return;
+
+        fetch('/api/announcement/read', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            announcement_id: ann.id,
+            user_id: uid
+          })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d.success) {
+            self.showToast(self.t('announcement_read_success'), 'success');
+          } else {
+            self.showToast(d.error || self.t('announcement_read_failed'), 'error');
+          }
+        })
+        .catch(function(e) {
+          self.showToast(self.t('announcement_read_failed'), 'error');
+        });
+      },
+
+      // ===== AI推荐系统 =====
+      doAIRecommend: function() {
+        var self = this;
+        if (!this.aiSearchQuery.trim()) {
+          this.showToast(this.t('ai_enter_keyword'), 'error');
+          return;
+        }
+        
+        this.aiLoading = true;
+        this.aiError = '';
+        this.aiRecommendations = [];
+        
+        fetch('/api/ai-recommend', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query: this.aiSearchQuery.trim(),
+            target: this.currentLang === 'auto' ? 'zh' : this.currentLang
+          })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          self.aiLoading = false;
+          if (d.success && d.recommendations) {
+            self.aiRecommendations = d.recommendations;
+            if (self.aiRecommendations.length === 0) {
+              self.showToast(self.t('ai_no_results'), 'info');
+            }
+          } else {
+            self.aiError = d.error || self.t('ai_recommend_failed');
+          }
+        })
+        .catch(function(e) {
+          self.aiLoading = false;
+          self.aiError = self.t('ai_recommend_failed');
+          console.log('AI推荐失败:', e);
+        });
+      },
+
+      loadAIConfig: function() {
+        var self = this;
+        fetch('AI.mini.json')
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d && d.ai) {
+            self.aiConfig = d;
+          }
+        })
+        .catch(function(e) {
+          console.log('加载AI配置失败:', e);
+        });
+      },
+
+      searchModByName: function(modName) {
+        // 切换到浏览模组标签页并搜索
+        this.switchTab('browse');
+        this.searchQuery = modName;
+        this.applyFilters();
+        this.showToast(this.t('ai_searching') + modName, 'info');
+      },
+
+      directDownloadMod: function(modName) {
+        // 直接下载模组
+        var self = this;
+        this.switchTab('browse');
+        this.searchQuery = modName;
+        this.applyFilters();
+        
+        setTimeout(function() {
+          // 搜索后尝试找到第一个匹配的模组并下载
+          var mod = self.mods.find(function(m) {
+            return m.Name && m.Name.toLowerCase().indexOf(modName.toLowerCase()) !== -1;
+          });
+          
+          if (mod) {
+            self.downloadMod(mod);
+          } else {
+            self.showToast('未找到模组: ' + modName, 'info');
+          }
+        }, 500);
+      }
+    },
+
+    mounted: function() {
+      this.loadUserFromStorage(); this.initLanguage(); this.loadSources(); this.loadMods(); this.loadConfig(); this.loadLicense(); this.loadPlayerModpacks(); this.startPolling(); this.checkUpdate(false); this.loadAIConfig();
+      // 恢复玩家自定义情报
+      try {
+        var savedIntel = JSON.parse(localStorage.getItem('tld_custom_intel') || '[]');
+        if (Array.isArray(savedIntel)) this.customIntel = savedIntel;
+      } catch(e) {}
+      // 启动时展示每日公告（带5 秒倒计时，未读完无法关闭）
+      var self = this;
+      setTimeout(function() {
+        self.showAnnouncementModal = true;
+        self.startAnnouncementCountdown(5);
+        fetch('/api/announcements')
+          .then(function(r) { return r.json(); })
+          .then(function(d) {
+            var list = (d && (d.announcements || d.data)) || [];
+            if (list && list.length) self.currentAnnouncement = list[0];
+          })
+          .catch(function(){});
+      }, 600);
+      // 如果用户已登录，检查未读公告
+      if (this.currentUser) {
+        this.checkUnreadAnnouncement();
+      }
+    },
+    beforeUnmount: function() { this.stopPolling(); if(this.announcementTimer) clearInterval(this.announcementTimer); }
+  }).mount('#app');
+}
+</script>
+
+{% endraw %}
+</body>
+</html>
