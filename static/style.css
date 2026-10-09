@@ -2461,3 +2461,49 @@ textarea::placeholder {
     padding-top: 12px;
     border-top: 1px solid var(--glass-border);
 }
+
+/* ---- 64 位系统要求提示（蓝色系，与加载器警告区分） ---- */
+.sys-notice {
+    background: rgba(33, 150, 243, 0.12);
+    border-color: rgba(33, 150, 243, 0.32);
+    color: #90caf9;
+}
+
+/* ---- 车间工具「放在哪里」说明块 ---- */
+.workshop-where {
+    margin: 18px 0 16px;
+    padding: 16px 18px;
+    border-radius: var(--radius-md);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--glass-border);
+}
+
+.workshop-where-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-dim);
+    margin-bottom: 11px;
+}
+
+.workshop-steps {
+    margin: 0;
+    padding-left: 22px;
+    font-size: 13px;
+    line-height: 2;
+    color: var(--text-light);
+}
+
+.workshop-steps li {
+    margin-bottom: 2px;
+}
+
+.workshop-hint {
+    margin-top: 12px;
+    padding: 9px 13px;
+    border-radius: var(--radius-sm, 6px);
+    background: rgba(255, 152, 0, 0.11);
+    border: 1px solid rgba(255, 152, 0, 0.28);
+    font-size: 12.5px;
+    line-height: 1.7;
+    color: #ffcc80;
+}

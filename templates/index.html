@@ -126,6 +126,10 @@
             <span class="modloader-icon">⚠️</span>
             <span class="modloader-text">{{ t('modloader_required') }}</span>
           </div>
+          <div class="modloader-notice sys-notice">
+            <span class="modloader-icon">💻</span>
+            <span class="modloader-text">{{ t('sys_requirement') }}</span>
+          </div>
           <a class="site-entry" href="https://ksny2025.gitlab.io/TLDTool/" target="_blank" rel="noopener">
             <span class="site-entry-label">{{ t('website') }}</span>
             <span class="site-entry-hint">{{ t('website_hint') }}</span>
@@ -231,6 +235,17 @@
           <div class="workshop-actions">
             <button class="action-btn primary" @click="downloadWorkshopTool">📥 {{ t('workshop_download') }}</button>
             <button class="action-btn secondary" @click="checkSteam">🔍 {{ t('steam_check') }}</button>
+          </div>
+
+          <div class="workshop-where">
+            <div class="workshop-where-title">📂 {{ t('workshop_where_title') }}</div>
+            <ol class="workshop-steps">
+              <li>{{ t('workshop_step1') }}</li>
+              <li>{{ t('workshop_step2') }}</li>
+              <li>{{ t('workshop_step3') }}</li>
+              <li>{{ t('workshop_step4') }}</li>
+            </ol>
+            <div class="workshop-hint">{{ t('workshop_mods_hint') }}</div>
           </div>
 
           <p class="workshop-tip">{{ t('workshop_tip') }}</p>
@@ -737,7 +752,7 @@
       <div v-if="detailMod">
         <h2 style="color:var(--accent);">{{ detailMod.Name }}</h2>
         <div v-if="translatedName && translatedName !== detailMod.Name" class="auto-translated-name">
-          <span class="zh-tag">中文</span>{{ translatedName }}
+          <span class="zh-tag">{{ t('translated_name_tag') }}</span>{{ translatedName }}
         </div>
         <p style="color:#888;margin:5px 0;">{{ t('author') }}{{ detailMod.Author }}</p>
         <p style="color:#888;margin:5px 0;">{{ t('version') }}{{ detailMod.Version }}</p>
@@ -763,7 +778,7 @@
         <p style="color:#888;margin:5px 0;" v-if="detailMod.Dependency && detailDepInfo.length === 0">{{ t('dep_fallback') }}{{ detailMod.Dependency }}</p>
         <div class="modal-description">{{ detailMod.Description }}</div>
         <div class="modal-description auto-translated-desc" v-if="translatedDesc">
-          <span class="zh-tag">中文简介</span><br>
+          <span class="zh-tag">{{ t('translated_desc_tag') }}</span><br>
           {{ translatedDesc }}
         </div>
         <div class="modal-description" v-if="detailMod.Changelog" style="margin-top:8px;"><strong>{{ t('changelog_label') }}</strong><br>{{ detailMod.Changelog }}</div>
@@ -1078,6 +1093,7 @@ function initVueApp() {
         appReady: true,
         version: FD.version,
         translations: FD.translations || {},
+        zhFallback: FD.zhFallback || {},
         activeTab: 'home',
         sidebarCollapsed: false,
         mobileMenuOpen: false,
@@ -1263,7 +1279,13 @@ function initVueApp() {
 
     methods: {
       t: function(key, args) {
-        var text = this.translations[key] || key;
+        // 文案查找顺序：当前语言 → 中文兜底 → 键名
+        // （非中文语言包未覆盖的键直接显示中文，不显示 [key]）
+        var cur = this.translations[key];
+        if (!cur || (typeof cur === 'string' && cur.charAt(0) === '[' && cur.charAt(cur.length - 1) === ']')) {
+          cur = this.zhFallback && this.zhFallback[key] ? this.zhFallback[key] : key;
+        }
+        var text = cur;
         if(args){Object.keys(args).forEach(function(k){text=text.replace('{'+k+'}',String(args[k]))})}
         return text;
       },
@@ -1272,6 +1294,11 @@ function initVueApp() {
         var saved=localStorage.getItem('tld_lang')||'auto'; this.currentLang=saved;
         var lang=saved;
         if(lang==='auto'){var nl=navigator.language||'';lang=nl.startsWith('zh')?'zh':nl.startsWith('fr')?'fr':nl.startsWith('ar')?'ar':nl.startsWith('es')?'es':nl.startsWith('ru')?'ru':'en'}
+        // 中文兜底文案先备好，其他语言缺失时回退显示中文
+        if(lang!=='zh'){
+          var self0=this;
+          fetch('/api/translations?lang=zh').then(function(r){return r.json()}).then(function(d){self0.zhFallback=d}).catch(function(){});
+        }
         if(lang!=='zh'||Object.keys(this.translations).length===0){var self=this;fetch('/api/translations?lang='+lang).then(function(r){return r.json()}).then(function(d){self.translations=d}).catch(function(){})}
       },
       changeLanguage: function() { localStorage.setItem('tld_lang',this.currentLang); this.initLanguage(); },
@@ -1510,17 +1537,43 @@ function initVueApp() {
       hasConflict: function(name) { return name && this.conflictModNames[name.toLowerCase()]; },
 
       // ===== 详情（#1 用正确数据源，#2 AbortController） =====
-      // ===== 自动翻译：打开详情时把名/简介翻成中文 =====
+      // ===== 自动翻译：打开详情时把名/简介翻成「当前界面语言」 =====
+      // 目标语言跟随界面：界面是中文就翻中文，是英文就翻英文，以此类推。
+      // 若界面语言不在工具支持的翻译语种之列，则回退到英文（用户要求）。
+      translateTargetLang: function() {
+        var map = { zh: 'zh', en: 'en', fr: 'fr', es: 'es', ru: 'ru', ar: 'ar' };
+        var lang = this.currentLang;
+        if (lang && lang !== 'auto' && map[lang]) return lang;
+        // auto：按浏览器语言判定；判定不出来或不支持 → en
+        var nl = (navigator.language || '').toLowerCase();
+        if (nl.indexOf('zh') === 0) return 'zh';
+        if (nl.indexOf('fr') === 0) return 'fr';
+        if (nl.indexOf('es') === 0) return 'es';
+        if (nl.indexOf('ru') === 0) return 'ru';
+        if (nl.indexOf('ar') === 0) return 'ar';
+        if (nl.indexOf('en') === 0) return 'en';
+        return 'en';
+      },
+
+      // 译文里是否含目标语言的代表性字符
+      _looksTranslated: function(s, target) {
+        if (!s) return false;
+        switch (target) {
+          case 'zh': return /[\u4e00-\u9fa5]/.test(s);
+          case 'ru': return /[\u0400-\u04ff]/.test(s);
+          case 'ar': return /[\u0600-\u06ff]/.test(s);
+          default:   return /[A-Za-z]/.test(s);   // en / fr / es 暂按拉丁字母判断
+        }
+      },
+
       autoTranslateDetail: function(mod) {
         if (!mod) return;
         var self = this;
         var name = (mod.Name || '').trim();
         var desc = (mod.Description || '').trim();
-
-        // 已经是中文就不翻了，省一次请求
-        function hasChinese(s) {
-          return /[\u4e00-\u9fa5]/.test(s);
-        }
+        var target = this.translateTargetLang();
+        // 该语种下原文已是用目标语言写的，就不用翻了
+        var alreadyTarget = function(s) { return self._looksTranslated(s, target); };
 
         // 带一次重试：公共翻译接口偶发失败，重试一次大多能成功
         function request(text, onDone) {
@@ -1529,12 +1582,13 @@ function initVueApp() {
             fetch('/api/translate', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ text: text, target: 'zh' })
+              body: JSON.stringify({ text: text, target: target })
             })
             .then(function(r) { return r.json(); })
             .then(function(d) {
               var out = (d && d.success && d.translated) ? d.translated : '';
-              if (hasChinese(out) && out !== text) {
+              // 必须确实被翻译了（结果含目标语言字符）才回填，避免显示原文
+              if (out && out !== text && self._looksTranslated(out, target)) {
                 onDone(out);
               } else if (++tried < 2) {
                 attempt();
@@ -1548,11 +1602,10 @@ function initVueApp() {
           attempt();
         }
 
-        if (name && !hasChinese(name)) {
-          var selfName = name;
+        if (name && !alreadyTarget(name)) {
           request(name, function(t) { self.translatedName = t; });
         }
-        if (desc && !hasChinese(desc)) {
+        if (desc && !alreadyTarget(desc)) {
           var shortDesc = desc.length > 400 ? desc.slice(0, 400) : desc;
           request(shortDesc, function(t) { self.translatedDesc = t; });
         }
@@ -1614,7 +1667,7 @@ function initVueApp() {
         fetch('/api/translate', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({text: text, target: 'zh'})
+          body: JSON.stringify({text: text, target: self.translateTargetLang()})
         })
         .then(function(r) { return r.json(); })
         .then(function(d) {
@@ -1800,7 +1853,18 @@ function initVueApp() {
       },
       saveConfig: function() {
         var self=this;
-        fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(this.config)}).then(function(){self.showToast(self.t('toast_settings_saved'),'success')}).catch(function(){self.showToast(self.t('save_failed'),'error')});
+        fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(this.config)})
+        .then(function(r){return r.json().then(function(d){return {ok:r.ok,data:d}})})
+        .then(function(res){
+          // 只有真正成功才提示成功；失败时显示服务端返回的真实原因
+          if(res.ok && res.data && res.data.success){
+            self.showToast(self.t('toast_settings_saved'),'success');
+          }else{
+            var msg=(res.data && res.data.error) || self.t('save_failed');
+            self.showToast(msg,'error');
+          }
+        })
+        .catch(function(){self.showToast(self.t('save_failed'),'error')});
       },
       browseExe: function() {
         var self=this;
@@ -1815,7 +1879,28 @@ function initVueApp() {
 
       checkUpdate: function(isManual) {
         var self=this; this.checkingUpdate=true;
-        fetch('/api/check-update').then(function(r){return r.json()}).then(function(d){if(d.update_available){if(confirm(self.t('update_found',{ver:d.latest})))self.performUpdate(d.download_url)}else if(isManual)alert(self.t('update_latest'))}).catch(function(){if(isManual)self.showToast(self.t('check_update_failed'),'error')}).finally(function(){self.checkingUpdate=false});
+        fetch('/api/check-update')
+        .then(function(r){return r.json().then(function(d){return {ok:r.ok, data:d}})})
+        .then(function(res){
+          var d = res.data || {};
+          // 区分三种情况：有新版本 / 检查成功但已是最新 / 检查失败（网盘拉取不到）
+          if (d.update_available) {
+            if (confirm(self.t('update_found',{ver:d.latest}))) {
+              self.performUpdate(d.download_url);
+            }
+          } else if (isManual) {
+            if (d.checked === false) {
+              // 后端未能从更新源读到版本号 —— 如实告知，不说成"检查失败"也不谎称最新
+              self.showToast(self.t('update_source_unreachable'), 'warning');
+            } else {
+              self.showToast(self.t('update_latest'), 'success');
+            }
+          }
+        })
+        .catch(function(){
+          if(isManual) self.showToast(self.t('check_update_failed'),'error');
+        })
+        .finally(function(){self.checkingUpdate=false});
       },
       performUpdate: function(url) {
         var self=this;
